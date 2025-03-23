@@ -1,0 +1,81 @@
+with tab2:
+    st.subheader("🎯 Breakdown of Qualified Leads")
+    st.metric("🎯 Qualified Leads (All Sources)", f"{qualified:,}")
+
+    # Run qualified lead breakdown queries
+    q_by_country = run_query(SQL["total_by_country"].replace("total_leads", "qualified_leads")
+                             .replace("student_id", "cs.id")
+                             .replace("dim_students", "dim_students ds JOIN data_marts.combined_subscriptions cs ON cs.value__meta_data_lead_id = ds.student_id"), 
+                             start_date, end_date)
+
+    q_by_utm = run_query(SQL["total_by_utm"].replace("total_leads", "qualified_leads")
+                         .replace("student_id", "cs.id")
+                         .replace("dim_students", "dim_students ds JOIN data_marts.combined_subscriptions cs ON cs.value__meta_data_lead_id = ds.student_id"), 
+                         start_date, end_date)
+
+    q_by_partner = run_query(SQL["total_by_partner"].replace("total_leads", "qualified_leads")
+                             .replace("student_id", "cs.id")
+                             .replace("dim_students", "dim_students ds JOIN data_marts.combined_subscriptions cs ON cs.value__meta_data_lead_id = ds.student_id"), 
+                             start_date, end_date)
+
+    q_course = run_query(SQL["total_leads_course_picked"].replace("total_leads", "qualified_leads")
+                         .replace("dim_students", "dim_students ds JOIN data_marts.combined_subscriptions cs ON cs.value__meta_data_lead_id = ds.student_id"), 
+                         start_date, end_date)
+
+    q_offer = run_query(SQL["total_leads_offer_type"].replace("total_leads", "qualified_leads")
+                        .replace("dim_students", "dim_students ds JOIN data_marts.combined_subscriptions cs ON cs.value__meta_data_lead_id = ds.student_id"), 
+                        start_date, end_date)
+
+    q_age = run_query(SQL["total_leads_age_group"].replace("total_leads", "qualified_leads")
+                      .replace("dim_students", "dim_students ds JOIN data_marts.combined_subscriptions cs ON cs.value__meta_data_lead_id = ds.student_id"), 
+                      start_date, end_date)
+
+    # Top Highlights
+    st.markdown(f"🧠 **Top Country**: `{q_by_country.iloc[0]['country']}` with `{q_by_country.iloc[0]['qualified_leads']:,}` qualified leads.")
+    st.markdown(f"🔍 **Top UTM Source**: `{q_by_utm.iloc[0]['utm_source']}` with `{q_by_utm.iloc[0]['qualified_leads']:,}` qualified leads.")
+    st.markdown(f"🤝 **Top Partner**: `{q_by_partner.iloc[0]['partner']}` with `{q_by_partner.iloc[0]['qualified_leads']:,}` qualified leads.")
+    st.markdown(f"📘 **Top Course**: `{q_course.iloc[0]['coursepicked']}` with `{q_course.iloc[0]['qualified_leads']:,}` qualified leads.")
+    st.markdown(f"👥 **Top Age Group**: `{q_age.iloc[0]['age_bucket']}` with `{q_age.iloc[0]['qualified_leads']:,}` qualified leads.")
+    st.markdown(f"🏷️ **Top Offer Type**: `{q_offer.iloc[0]['offer_type']}` with `{q_offer.iloc[0]['qualified_leads']:,}` qualified leads.")
+
+    # First Row
+    col1, col2 = st.columns(2)
+    with col1:
+        st.write("### 📍 Qualified Leads by Country")
+        st.dataframe(q_by_country)
+        fig = px.bar(q_by_country, x="country", y="qualified_leads", text="qualified_leads", title="Qualified Leads by Country")
+        st.plotly_chart(fig, use_container_width=True)
+
+    with col2:
+        st.write("### 🔍 Qualified Leads by UTM Source")
+        st.dataframe(q_by_utm)
+        fig = px.bar(q_by_utm, x="utm_source", y="qualified_leads", text="qualified_leads", title="Qualified Leads by UTM Source")
+        st.plotly_chart(fig, use_container_width=True)
+
+    # Second Row
+    col3, col4 = st.columns(2)
+    with col3:
+        st.write("### 🤝 Qualified Leads by Partner")
+        st.dataframe(q_by_partner)
+        fig = px.bar(q_by_partner, x="partner", y="qualified_leads", text="qualified_leads", title="Qualified Leads by Partner")
+        st.plotly_chart(fig, use_container_width=True)
+
+    with col4:
+        st.write("### 📘 Qualified Leads by Course Picked")
+        st.dataframe(q_course)
+        fig = px.bar(q_course, x="coursepicked", y="qualified_leads", text="qualified_leads", title="Qualified Leads by Course")
+        st.plotly_chart(fig, use_container_width=True)
+
+    # Third Row
+    col5, col6 = st.columns(2)
+    with col5:
+        st.write("### 🏷️ Qualified Leads by Offer Type")
+        st.dataframe(q_offer)
+        fig = px.bar(q_offer, x="offer_type", y="qualified_leads", text="qualified_leads", title="Qualified Leads by Offer Type")
+        st.plotly_chart(fig, use_container_width=True)
+
+    with col6:
+        st.write("### 👥 Qualified Leads by Age Group")
+        st.dataframe(q_age)
+        fig = px.bar(q_age, x="age_bucket", y="qualified_leads", text="qualified_leads", title="Qualified Leads by Age Group")
+        st.plotly_chart(fig, use_container_width=True)
