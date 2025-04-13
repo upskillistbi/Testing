@@ -19,6 +19,147 @@ def run_query(query, start_date, end_date):
     conn.close()
     return df
 
+def run_query10(query, start_date, end_date):
+    conn = psycopg2.connect(
+        host="misreporting.cxgsxkol4p2y.eu-west-1.redshift.amazonaws.com",
+        port=5439,
+        dbname="misreportingdb",
+        user="etluser",
+        password="Etluser12345"
+    )
+    cursor = conn.cursor()
+    query = query.format(start_date=start_date, end_date=end_date)
+    df = pd.read_sql(query, conn)
+    conn.close()
+    return df
+
+def run_query1(query, start_date, end_date):
+    conn = psycopg2.connect(
+        host="misreporting.cxgsxkol4p2y.eu-west-1.redshift.amazonaws.com",
+        port=5439,
+        dbname="misreportingdb",
+        user="etluser",
+        password="Etluser12345"
+    )
+    cursor = conn.cursor()
+    query = query.format(start_date=start_date, end_date=end_date)
+    df = pd.read_sql(query, conn)
+    conn.close()
+    return df
+
+def run_query2(query, start_date, end_date):
+    conn = psycopg2.connect(
+        host="misreporting.cxgsxkol4p2y.eu-west-1.redshift.amazonaws.com",
+        port=5439,
+        dbname="misreportingdb",
+        user="etluser",
+        password="Etluser12345"
+    )
+    cursor = conn.cursor()
+    query = query.format(start_date=start_date, end_date=end_date)
+    df = pd.read_sql(query, conn)
+    conn.close()
+    return df
+
+def run_query3(query, start_date, end_date):
+    conn = psycopg2.connect(
+        host="misreporting.cxgsxkol4p2y.eu-west-1.redshift.amazonaws.com",
+        port=5439,
+        dbname="misreportingdb",
+        user="etluser",
+        password="Etluser12345"
+    )
+    cursor = conn.cursor()
+    query = query.format(start_date=start_date, end_date=end_date)
+    df = pd.read_sql(query, conn)
+    conn.close()
+    return df
+
+def run_query4(query, start_date, end_date):
+    conn = psycopg2.connect(
+        host="misreporting.cxgsxkol4p2y.eu-west-1.redshift.amazonaws.com",
+        port=5439,
+        dbname="misreportingdb",
+        user="etluser",
+        password="Etluser12345"
+    )
+    cursor = conn.cursor()
+    query = query.format(start_date=start_date, end_date=end_date)
+    df = pd.read_sql(query, conn)
+    conn.close()
+    return df
+
+def run_query5(query, start_date, end_date):
+    conn = psycopg2.connect(
+        host="misreporting.cxgsxkol4p2y.eu-west-1.redshift.amazonaws.com",
+        port=5439,
+        dbname="misreportingdb",
+        user="etluser",
+        password="Etluser12345"
+    )
+    cursor = conn.cursor()
+    query = query.format(start_date=start_date, end_date=end_date)
+    df = pd.read_sql(query, conn)
+    conn.close()
+    return df
+
+def run_query6(query, start_date, end_date):
+    conn = psycopg2.connect(
+        host="misreporting.cxgsxkol4p2y.eu-west-1.redshift.amazonaws.com",
+        port=5439,
+        dbname="misreportingdb",
+        user="etluser",
+        password="Etluser12345"
+    )
+    cursor = conn.cursor()
+    query = query.format(start_date=start_date, end_date=end_date)
+    df = pd.read_sql(query, conn)
+    conn.close()
+    return df
+
+
+def run_query7(query, start_date, end_date):
+    conn = psycopg2.connect(
+        host="misreporting.cxgsxkol4p2y.eu-west-1.redshift.amazonaws.com",
+        port=5439,
+        dbname="misreportingdb",
+        user="etluser",
+        password="Etluser12345"
+    )
+    cursor = conn.cursor()
+    query = query.format(start_date=start_date, end_date=end_date)
+    df = pd.read_sql(query, conn)
+    conn.close()
+    return df
+
+def run_query8(query, start_date, end_date):
+    conn = psycopg2.connect(
+        host="misreporting.cxgsxkol4p2y.eu-west-1.redshift.amazonaws.com",
+        port=5439,
+        dbname="misreportingdb",
+        user="etluser",
+        password="Etluser12345"
+    )
+    cursor = conn.cursor()
+    query = query.format(start_date=start_date, end_date=end_date)
+    df = pd.read_sql(query, conn)
+    conn.close()
+    return df
+
+def run_query9(query, start_date, end_date):
+    conn = psycopg2.connect(
+        host="misreporting.cxgsxkol4p2y.eu-west-1.redshift.amazonaws.com",
+        port=5439,
+        dbname="misreportingdb",
+        user="etluser",
+        password="Etluser12345"
+    )
+    cursor = conn.cursor()
+    query = query.format(start_date=start_date, end_date=end_date)
+    df = pd.read_sql(query, conn)
+    conn.close()
+    return df
+
 # SQL Queries
 SQL = {
     "total_leads":"""select COUNT(DISTINCT student_id) AS total_leads
@@ -56,7 +197,7 @@ GROUP BY 1 ORDER BY total_leads DESC;""",
         WHEN age_group IN ('25-30', '31-34') THEN '25-34'
         WHEN age_group IN ('35-40', '41-45') THEN '35-44'
         WHEN age_group IN ('46-50', '51-55') THEN '45-54'
-        ELSE '55+'
+        ELSE age_group
     END AS age_bucket,
     COUNT(DISTINCT student_id) AS total_leads
 FROM data_warehouse.dim_students
@@ -806,6 +947,166 @@ lesson_cc_queries = {
     """
 }
 
+reactivation_queries_clean = {
+    # 1. Total Reactivated Users
+    "Total Reactivated Users": """
+        SELECT 
+            COUNT(DISTINCT value__meta_data_lead_id) AS total_reactivated_users
+        FROM data_marts.combined_subscriptions
+        WHERE reactivated_on BETWEEN '{start_date}' AND '{end_date}';
+    """,
+
+    # 2. Reactivated Users by Country
+    "Reactivated Users by Country": """
+        SELECT 
+            COALESCE(ds.country, 'Unknown') AS country,
+            COUNT(DISTINCT cs.value__meta_data_lead_id) AS total_reactivated_users
+        FROM data_marts.combined_subscriptions cs
+        JOIN data_warehouse.dim_students ds 
+            ON cs.value__meta_data_lead_id = ds.student_id
+        WHERE cs.reactivated_on BETWEEN '{start_date}' AND '{end_date}'
+        GROUP BY COALESCE(ds.country, 'Unknown')
+        ORDER BY total_reactivated_users DESC;
+    """,
+
+    # 3. Reactivated Users by Age Group
+    "Reactivated Users by Age Group": """
+        SELECT 
+            COALESCE(ds.age_group, 'Unknown') AS age_group,
+            COUNT(DISTINCT cs.value__meta_data_lead_id) AS total_reactivated_users
+        FROM data_marts.combined_subscriptions cs
+        JOIN data_warehouse.dim_students ds 
+            ON cs.value__meta_data_lead_id = ds.student_id
+        WHERE cs.reactivated_on BETWEEN '{start_date}' AND '{end_date}'
+        GROUP BY COALESCE(ds.age_group, 'Unknown')
+        ORDER BY total_reactivated_users DESC;
+    """,
+
+    # 4. Reactivated Users by UTM Source
+    "Reactivated Users by UTM Source": """
+        SELECT 
+            COALESCE(ds.latest_utm_source, 'Unknown') AS utm_source,
+            COUNT(DISTINCT cs.value__meta_data_lead_id) AS total_reactivated_users
+        FROM data_marts.combined_subscriptions cs
+        JOIN data_warehouse.dim_students ds 
+            ON cs.value__meta_data_lead_id = ds.student_id
+        WHERE cs.reactivated_on BETWEEN '{start_date}' AND '{end_date}'
+        GROUP BY COALESCE(ds.latest_utm_source, 'Unknown')
+        ORDER BY total_reactivated_users DESC;
+    """,
+
+    # 5. Reactivated Users by Offer Type
+    "Reactivated Users by Offer Type": """
+        SELECT 
+            COALESCE(ds.offer_type, 'Unknown') AS offer_type,
+            COUNT(DISTINCT cs.value__meta_data_lead_id) AS total_reactivated_users
+        FROM data_marts.combined_subscriptions cs
+        JOIN data_warehouse.dim_students ds 
+            ON cs.value__meta_data_lead_id = ds.student_id
+        WHERE cs.reactivated_on BETWEEN '{start_date}' AND '{end_date}'
+        GROUP BY COALESCE(ds.offer_type, 'Unknown')
+        ORDER BY total_reactivated_users DESC;
+    """,
+
+
+
+    # 7. Reactivated Users by Month
+    "Reactivated Users by Month": """
+        SELECT 
+            DATE_TRUNC('month', reactivated_on) AS month,
+            COUNT(DISTINCT value__meta_data_lead_id) AS total_reactivated_users
+        FROM data_marts.combined_subscriptions
+        WHERE reactivated_on BETWEEN '{start_date}' AND '{end_date}'
+        GROUP BY DATE_TRUNC('month', reactivated_on)
+        ORDER BY month;
+    """,
+
+    # 8. Reactivated Users by Course (Post Reactivation Attendance)
+    "Reactivated Users by Course": """
+        SELECT 
+            COALESCE(DSC.course_slug, 'Unknown') AS course_slug,
+            COUNT(DISTINCT FA.value__student_id) AS total_reactivated_users
+        FROM data_marts.combined_subscriptions CS
+        JOIN data_warehouse.dim_schedules DSC 
+            ON CS.value__meta_data_lead_id = DSC.student_id 
+           AND DSC.registered_on >= CS.reactivated_on
+        JOIN firestore_api.firestore_attendance FA 
+            ON DSC.registration_id = FA.value__registrations_id
+           AND FA.value__create_at >= CS.reactivated_on
+        WHERE FA.value__watched__bigint > 0
+        GROUP BY COALESCE(DSC.course_slug, 'Unknown')
+        ORDER BY total_reactivated_users DESC;
+    """,
+
+    # 9. Reactivated + Attended At Least One Lesson
+    "Reactivated Attended At Least One Lesson": """
+        SELECT 
+            COALESCE(DSC.course_slug, 'Unknown') AS course_slug,
+            COUNT(DISTINCT FA.value__student_id) AS attended_users
+        FROM data_marts.combined_subscriptions CS
+        JOIN data_warehouse.dim_schedules DSC 
+            ON CS.value__meta_data_lead_id = DSC.student_id 
+           AND DSC.registered_on >= CS.reactivated_on
+        JOIN firestore_api.firestore_attendance FA 
+            ON DSC.registration_id = FA.value__registrations_id
+           AND FA.value__create_at >= CS.reactivated_on
+        WHERE FA.value__watched__bigint > 0
+        GROUP BY COALESCE(DSC.course_slug, 'Unknown')
+        ORDER BY attended_users DESC;
+    """,
+
+    # 10. Reactivated + Full Attendance (Dynamic Lessons)
+    "Reactivated Full Attendance": """
+        WITH course_total_lessons AS (
+            SELECT 
+                course_slug,
+                COUNT(DISTINCT value__lesson_number__bigint) AS total_lessons
+            FROM firestore_api.firestore_attendance
+            WHERE value__watched__bigint > 0
+            GROUP BY course_slug
+        ),
+        attendance_counts AS (
+            SELECT 
+                DSC.course_slug,
+                FA.value__registrations_id AS registration_id,
+                COUNT(DISTINCT FA.value__lesson_number__bigint) AS lessons_watched
+            FROM data_marts.combined_subscriptions CS
+            JOIN data_warehouse.dim_schedules DSC 
+                ON CS.value__meta_data_lead_id = DSC.student_id 
+               AND DSC.registered_on >= CS.reactivated_on
+            JOIN firestore_api.firestore_attendance FA 
+                ON DSC.registration_id = FA.value__registrations_id
+               AND FA.value__create_at >= CS.reactivated_on
+            WHERE FA.value__watched__bigint > 0
+            GROUP BY DSC.course_slug, FA.value__registrations_id
+        )
+        SELECT 
+            ac.course_slug,
+            COUNT(DISTINCT ac.registration_id) AS full_attendance_users
+        FROM attendance_counts ac
+        JOIN course_total_lessons ctl 
+            ON ac.course_slug = ctl.course_slug
+        WHERE ac.lessons_watched = ctl.total_lessons
+        GROUP BY ac.course_slug
+        ORDER BY full_attendance_users DESC;
+    """,
+
+    # 11. Reactivated + Cancelled Again
+    "Reactivated Cancelled Again": """
+        SELECT 
+            COALESCE(DSC.course_slug, 'Unknown') AS course_slug,
+            COUNT(DISTINCT CS.value__meta_data_lead_id) AS cancelled_again
+        FROM data_marts.combined_subscriptions CS
+        LEFT JOIN data_warehouse.dim_schedules DSC 
+            ON CS.value__meta_data_lead_id = DSC.student_id 
+           AND DSC.registered_on >= CS.reactivated_on
+        WHERE CS.reactivated_on BETWEEN '{start_date}' AND '{end_date}'
+          AND CS.cancelled_after_reactivation = TRUE
+        GROUP BY COALESCE(DSC.course_slug, 'Unknown')
+        ORDER BY cancelled_again DESC;
+    """
+}
+
 
 
 # ---- SQL Queries ----
@@ -894,13 +1195,13 @@ if run_button:
             st.subheader("📊 Breakdown of Total Leads")
             st.metric("📥 Total Leads (All Sources)", f"{total:,}")
         ##   by_utm_medium=run_query(SQL["total_leads_utm_medium"] ,start_date, end_date)
-            by_country = run_query(SQL["total_by_country"], start_date, end_date)
-            by_utm = run_query(SQL["total_by_utm"], start_date, end_date)
-            by_partner = run_query(SQL["total_by_partner"], start_date, end_date)
-            total_leads_course_picked= run_query(SQL["total_leads_course_picked"], start_date, end_date)
-        ## total_leads_profile_partner= run_query(SQL["total_leads_profile_partner"], start_date, end_date)
-            total_leads_offer_type= run_query(SQL["total_leads_offer_type"], start_date, end_date)
-            total_leads_age_group= run_query(SQL["total_leads_age_group"], start_date, end_date)
+            by_country = run_query10(SQL["total_by_country"], start_date, end_date)
+            by_utm = run_query10(SQL["total_by_utm"], start_date, end_date)
+            by_partner = run_query10(SQL["total_by_partner"], start_date, end_date)
+            total_leads_course_picked= run_query10(SQL["total_leads_course_picked"], start_date, end_date)
+        ## total_leads_profile_partner= run_query10(SQL["total_leads_profile_partner"], start_date, end_date)
+            total_leads_offer_type= run_query10(SQL["total_leads_offer_type"], start_date, end_date)
+            total_leads_age_group= run_query10(SQL["total_leads_age_group"], start_date, end_date)
 
         
             st.markdown(f"🧠 **Top Country**: `{by_country.iloc[0]['country']}` with `{by_country.iloc[0]['total_leads']:,}` leads.")
@@ -962,30 +1263,30 @@ if run_button:
             st.metric("🎯 Qualified Leads (All Sources)", f"{qualified:,}")
 
             # Run qualified lead breakdown queries
-            q_by_country = run_query(SQL["total_by_country"].replace("total_leads", "qualified_leads")
+            q_by_country = run_query2(SQL["total_by_country"].replace("total_leads", "qualified_leads")
                                     .replace("student_id", "cs.id")
                                     .replace("dim_students", "dim_students ds JOIN data_marts.combined_subscriptions cs ON cs.value__meta_data_lead_id = ds.student_id"), 
                                     start_date, end_date)
 
-            q_by_utm = run_query(SQL["total_by_utm"].replace("total_leads", "qualified_leads")
+            q_by_utm = run_query2(SQL["total_by_utm"].replace("total_leads", "qualified_leads")
                                 .replace("student_id", "cs.id")
                                 .replace("dim_students", "dim_students ds JOIN data_marts.combined_subscriptions cs ON cs.value__meta_data_lead_id = ds.student_id"), 
                                 start_date, end_date)
 
-            q_by_partner = run_query(SQL["total_by_partner"].replace("total_leads", "qualified_leads")
+            q_by_partner = run_query2(SQL["total_by_partner"].replace("total_leads", "qualified_leads")
                                     .replace("student_id", "cs.id")
                                     .replace("dim_students", "dim_students ds JOIN data_marts.combined_subscriptions cs ON cs.value__meta_data_lead_id = ds.student_id"), 
                                     start_date, end_date)
 
-            q_course = run_query(SQL["total_leads_course_picked"].replace("total_leads", "qualified_leads")
+            q_course = run_query2(SQL["total_leads_course_picked"].replace("total_leads", "qualified_leads")
                                 .replace("dim_students", "dim_students ds JOIN data_marts.combined_subscriptions cs ON cs.value__meta_data_lead_id = ds.student_id"), 
                                 start_date, end_date)
 
-            q_offer = run_query(SQL["total_leads_offer_type"].replace("total_leads", "qualified_leads")
+            q_offer = run_query2(SQL["total_leads_offer_type"].replace("total_leads", "qualified_leads")
                                 .replace("dim_students", "dim_students ds JOIN data_marts.combined_subscriptions cs ON cs.value__meta_data_lead_id = ds.student_id"), 
                                 start_date, end_date)
 
-            q_age = run_query(SQL["total_leads_age_group"].replace("total_leads", "qualified_leads")
+            q_age = run_query2(SQL["total_leads_age_group"].replace("total_leads", "qualified_leads")
                             .replace("dim_students", "dim_students ds JOIN data_marts.combined_subscriptions cs ON cs.value__meta_data_lead_id = ds.student_id"), 
                             start_date, end_date)
 
@@ -1041,11 +1342,11 @@ if run_button:
 
 
     with tab3:
-            leads_df = run_query(sql_mom["leads_mom"], start_date, end_date)
-            qualified_df = run_query(sql_mom["qualified_mom"], start_date, end_date)
-            cancelled_df = run_query(sql_mom["cancelled_mom"], start_date, end_date)
-            conversion_df = run_query(sql_mom["conversion_mom"], start_date, end_date)
-            utm_df = run_query(sql_mom["utm_kpis"], start_date, end_date)
+            leads_df = run_query3(sql_mom["leads_mom"], start_date, end_date)
+            qualified_df = run_query3(sql_mom["qualified_mom"], start_date, end_date)
+            cancelled_df = run_query3(sql_mom["cancelled_mom"], start_date, end_date)
+            conversion_df = run_query3(sql_mom["conversion_mom"], start_date, end_date)
+            utm_df = run_query3(sql_mom["utm_kpis"], start_date, end_date)
 
                 # --- UTM KPI Cards
             st.subheader("🔍 UTM Source KPIs (Top 5)")
@@ -1122,21 +1423,21 @@ if run_button:
         st.subheader("📝 Registrations Overview")
 
         # --- General Registrations Queries ---
-        reg_country = run_query(registration_queries["Registrations by Country"], start_date, end_date)
-        reg_utm = run_query(registration_queries["Registrations by UTM Source"], start_date, end_date)
-        reg_offer = run_query(registration_queries["Registrations by Offer Type"], start_date, end_date)
-        reg_age = run_query(registration_queries["Registrations by Age Group"], start_date, end_date)
-        reg_gender = run_query(registration_queries["Registrations by Gender"], start_date, end_date)
-        reg_course = run_query(registration_queries["Registrations by Course Slug"], start_date, end_date)
-        reg_monthly = run_query(registration_queries["Monthly Registrations (General)"], start_date, end_date)
+        reg_country = run_query4(registration_queries["Registrations by Country"], start_date, end_date)
+        reg_utm = run_query4(registration_queries["Registrations by UTM Source"], start_date, end_date)
+        reg_offer = run_query4(registration_queries["Registrations by Offer Type"], start_date, end_date)
+        reg_age = run_query4(registration_queries["Registrations by Age Group"], start_date, end_date)
+        reg_gender = run_query4(registration_queries["Registrations by Gender"], start_date, end_date)
+        reg_course = run_query4(registration_queries["Registrations by Course Slug"], start_date, end_date)
+        reg_monthly = run_query4(registration_queries["Monthly Registrations (General)"], start_date, end_date)
 
         # --- Lead Funnel Registrations Queries ---
-        lead_total = run_query(lead_funnel_queries["Total Lead Funnel Registrations"], start_date, end_date)
-        lead_country = run_query(lead_funnel_queries["Lead Registrations by Country"], start_date, end_date)
-        lead_age = run_query(lead_funnel_queries["Lead Registrations by Age Group"], start_date, end_date)
-        lead_utm = run_query(lead_funnel_queries["Lead Registrations by UTM Source"], start_date, end_date)
-        lead_offer = run_query(lead_funnel_queries["Lead Registrations by Offer Type"], start_date, end_date)
-        lead_course = run_query(lead_funnel_queries["Lead Registrations by Course Slug"], start_date, end_date)
+        lead_total = run_query4(lead_funnel_queries["Total Lead Funnel Registrations"], start_date, end_date)
+        lead_country = run_query4(lead_funnel_queries["Lead Registrations by Country"], start_date, end_date)
+        lead_age = run_query4(lead_funnel_queries["Lead Registrations by Age Group"], start_date, end_date)
+        lead_utm = run_query4(lead_funnel_queries["Lead Registrations by UTM Source"], start_date, end_date)
+        lead_offer = run_query4(lead_funnel_queries["Lead Registrations by Offer Type"], start_date, end_date)
+        lead_course = run_query4(lead_funnel_queries["Lead Registrations by Course Slug"], start_date, end_date)
 
         # --- Reusable function for metric display ---
         def display_metric(title, df, xcol, ycol):
@@ -1231,12 +1532,12 @@ if run_button:
             st.markdown(f"## 📊 {view_title}")
 
             # --- Run queries for selected view ---
-            country_df = run_query(selected_queries[f"Attendance {view_label} by Country"], start_date, end_date)
-            age_df = run_query(selected_queries[f"Attendance {view_label} by Age Group"], start_date, end_date)
-            utm_df = run_query(selected_queries[f"Attendance {view_label} by UTM Source"], start_date, end_date)
-            offer_df = run_query(selected_queries[f"Attendance {view_label} by Offer Type"], start_date, end_date)
-            course_df = run_query(selected_queries[f"Attendance {view_label} by Course Slug"], start_date, end_date)
-            month_df = run_query(selected_queries[f"Attendance {view_label} by Month"], start_date, end_date)
+            country_df = run_query5(selected_queries[f"Attendance {view_label} by Country"], start_date, end_date)
+            age_df = run_query5(selected_queries[f"Attendance {view_label} by Age Group"], start_date, end_date)
+            utm_df = run_query5(selected_queries[f"Attendance {view_label} by UTM Source"], start_date, end_date)
+            offer_df = run_query5(selected_queries[f"Attendance {view_label} by Offer Type"], start_date, end_date)
+            course_df = run_query5(selected_queries[f"Attendance {view_label} by Course Slug"], start_date, end_date)
+            month_df = run_query5(selected_queries[f"Attendance {view_label} by Month"], start_date, end_date)
 
             # --- Top Metrics ---
             total_attendance = course_df["total_students_attended"].sum() if not course_df.empty else 0
@@ -1309,7 +1610,7 @@ if run_button:
 
         for metric_name, query in lesson_leads_queries.items():
             st.markdown(f"### {metric_name}")
-            df = run_query(query, start_date, end_date)
+            df = run_query7(query, start_date, end_date)
 
             if not df.empty:
                 # Table
@@ -1354,7 +1655,7 @@ if run_button:
 
         for metric_name, query in lesson_cc_queries.items():
             st.markdown(f"### {metric_name}")
-            df = run_query(query, start_date, end_date)
+            df = run_query7(query, start_date, end_date)
 
             if not df.empty:
                 # Table
@@ -1392,15 +1693,67 @@ if run_button:
 
             st.markdown("---")
 
-
     with tab8:
+        st.title("♻️ Reactivations Analysis (Clean — Post Reactivation Only)")
+
+                # Load data from your clean SQL dictionary
+        st.info(f"Showing data for selected range: **{start_date} to {end_date}**")
+
+        for metric_name, query in reactivation_queries_clean.items():
+            st.markdown(f"### {metric_name}")
+            df = run_query8(query, start_date, end_date)
+
+            if not df.empty:
+                # Display data table
+                st.dataframe(df)
+
+                # --- Top Insights ---
+                top_row = df.iloc[0]
+                if "Course" in metric_name and df.columns[0] in ["course_slug", "course_id"]:
+                    st.markdown(f"🚀 **Top Course:** `{top_row[df.columns[0]]}` with `{top_row[df.columns[1]]:,}` users")
+                if "Country" in metric_name:
+                    st.markdown(f"🌍 **Top Country:** `{top_row['country']}` with `{top_row[df.columns[1]]:,}` users")
+                if "Age Group" in metric_name:
+                    st.markdown(f"👥 **Top Age Group:** `{top_row['age_group']}` with `{top_row[df.columns[1]]:,}` users")
+                if "UTM" in metric_name:
+                    st.markdown(f"🔗 **Top UTM Source:** `{top_row['utm_source']}` with `{top_row[df.columns[1]]:,}` users")
+                if "Offer Type" in metric_name:
+                    st.markdown(f"🏷️ **Top Offer Type:** `{top_row['offer_type']}` with `{top_row[df.columns[1]]:,}` users")
+                if "Cancelled Again" in metric_name:
+                    st.markdown(f"❌ **Top Course for Repeat Cancellations:** `{top_row['course_slug']}` with `{top_row['cancelled_again']:,}` users")
+                if "Full Attendance" in metric_name:
+                    st.markdown(f"🏆 **Top Full Attendance Course:** `{top_row['course_slug']}` with `{top_row['full_attendance_users']:,}` users")
+
+                # --- Chart (Bar or Line auto-detect) ---
+                numeric_cols = [col for col in df.columns if df[col].dtype != 'object']
+                if len(numeric_cols) >= 1:
+                    x_col = df.columns[0]
+                    y_col = numeric_cols[0]
+
+                    if "Month" in metric_name or "Trend" in metric_name:
+                        fig = px.line(df, x=x_col, y=y_col, markers=True, title=metric_name)
+                    else:
+                        fig = px.bar(df, x=x_col, y=y_col, text=y_col, title=metric_name)
+
+                    st.plotly_chart(fig, use_container_width=True)
+
+                # --- CSV Export ---
+                csv = df.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label=f"Download {metric_name} as CSV",
+                    data=csv,
+                    file_name=f"{metric_name.replace(' ', '_').lower()}.csv",
+                    mime='text/csv',
+                )
+
+    with tab9:
         st.header("📊 Revenue Tab Insights")
 
         # -- Top Summary Metrics --
         with st.spinner("Loading summary metrics..."):
-            total_revenue = run_query(revenue_queries["Total Revenue"], start_date, end_date).iloc[0, 0]
-            unique_buyers = run_query(revenue_queries["Unique Buyers"], start_date, end_date).iloc[0, 0]
-            aov = run_query(revenue_queries["Average Order Value (AOV)"], start_date, end_date).iloc[0, 0]
+            total_revenue = run_query9(revenue_queries["Total Revenue"], start_date, end_date).iloc[0, 0]
+            unique_buyers = run_query9(revenue_queries["Unique Buyers"], start_date, end_date).iloc[0, 0]
+            aov = run_query9(revenue_queries["Average Order Value (AOV)"], start_date, end_date).iloc[0, 0]
 
             col1, col2, col3 = st.columns(3)
             col1.metric("💰 Total Revenue", f"{total_revenue:,.2f}")
@@ -1412,7 +1765,7 @@ if run_button:
         # -- Helper Function --
         def display_chart_table(title, query_key, x_col=None, y_col=None, chart_type="bar"):
             with st.spinner(f"Loading {title}..."):
-                df = run_query(revenue_queries[query_key], start_date, end_date)
+                df = run_query9(revenue_queries[query_key], start_date, end_date)
                 if not df.empty:
                     st.subheader(title)
                     st.dataframe(df)
@@ -1431,9 +1784,9 @@ if run_button:
                     st.markdown("---")
 
         # -- Revenue Splits --
-        rev1 = run_query(revenue_queries["Rev1 Revenue"], start_date, end_date).iloc[0, 0]
-        rev2 = run_query(revenue_queries["Rev2 Revenue"], start_date, end_date).iloc[0, 0]
-        rev3 = run_query(revenue_queries["Rev3 Revenue"], start_date, end_date).iloc[0, 0]
+        rev1 = run_query9(revenue_queries["Rev1 Revenue"], start_date, end_date).iloc[0, 0]
+        rev2 = run_query9(revenue_queries["Rev2 Revenue"], start_date, end_date).iloc[0, 0]
+        rev3 = run_query9(revenue_queries["Rev3 Revenue"], start_date, end_date).iloc[0, 0]
         rev_split_df = pd.DataFrame({"Type": ["Rev1", "Rev2", "Rev3"], "Revenue": [rev1, rev2, rev3]})
         st.subheader("Revenue Split: Rev1 / Rev2 / Rev3")
         st.dataframe(rev_split_df)
