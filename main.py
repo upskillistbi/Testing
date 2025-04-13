@@ -1021,96 +1021,22 @@ reactivation_queries_clean = {
         ORDER BY month;
     """,
 
-    # 8. Reactivated Users by Course (Post Reactivation Attendance)
-    "Reactivated Users by Course": """
-        SELECT 
-            COALESCE(DSC.course_slug, 'Unknown') AS course_slug,
-            COUNT(DISTINCT FA.value__student_id) AS total_reactivated_users
-        FROM data_marts.combined_subscriptions CS
-        JOIN data_warehouse.dim_schedules DSC 
-            ON CS.value__meta_data_lead_id = DSC.student_id 
-           AND DSC.registered_on >= CS.reactivated_on
-        JOIN firestore_api.firestore_attendance FA 
-            ON DSC.registration_id = FA.value__registrations_id
-           AND FA.value__create_at >= CS.reactivated_on
-        WHERE FA.value__watched__bigint > 0
-        GROUP BY COALESCE(DSC.course_slug, 'Unknown')
-        ORDER BY total_reactivated_users DESC;
-    """,
-
-    # 9. Reactivated + Attended At Least One Lesson
-    "Reactivated Attended At Least One Lesson": """
-        SELECT 
-            COALESCE(DSC.course_slug, 'Unknown') AS course_slug,
-            COUNT(DISTINCT FA.value__student_id) AS attended_users
-        FROM data_marts.combined_subscriptions CS
-        JOIN data_warehouse.dim_schedules DSC 
-            ON CS.value__meta_data_lead_id = DSC.student_id 
-           AND DSC.registered_on >= CS.reactivated_on
-        JOIN firestore_api.firestore_attendance FA 
-            ON DSC.registration_id = FA.value__registrations_id
-           AND FA.value__create_at >= CS.reactivated_on
-        WHERE FA.value__watched__bigint > 0
-        GROUP BY COALESCE(DSC.course_slug, 'Unknown')
-        ORDER BY attended_users DESC;
-    """,
-
-    # 10. Reactivated + Full Attendance (Dynamic Lessons)
-    "Reactivated Full Attendance": """
-        WITH course_total_lessons AS (
-            SELECT 
-                course_slug,
-                COUNT(DISTINCT value__lesson_number__bigint) AS total_lessons
-            FROM firestore_api.firestore_attendance
-            WHERE value__watched__bigint > 0
-            GROUP BY course_slug
-        ),
-        attendance_counts AS (
-            SELECT 
-                DSC.course_slug,
-                FA.value__registrations_id AS registration_id,
-                COUNT(DISTINCT FA.value__lesson_number__bigint) AS lessons_watched
-            FROM data_marts.combined_subscriptions CS
-            JOIN data_warehouse.dim_schedules DSC 
-                ON CS.value__meta_data_lead_id = DSC.student_id 
-               AND DSC.registered_on >= CS.reactivated_on
-            JOIN firestore_api.firestore_attendance FA 
-                ON DSC.registration_id = FA.value__registrations_id
-               AND FA.value__create_at >= CS.reactivated_on
-            WHERE FA.value__watched__bigint > 0
-            GROUP BY DSC.course_slug, FA.value__registrations_id
-        )
-        SELECT 
-            ac.course_slug,
-            COUNT(DISTINCT ac.registration_id) AS full_attendance_users
-        FROM attendance_counts ac
-        JOIN course_total_lessons ctl 
-            ON ac.course_slug = ctl.course_slug
-        WHERE ac.lessons_watched = ctl.total_lessons
-        GROUP BY ac.course_slug
-        ORDER BY full_attendance_users DESC;
-    """,
-
-    # 11. Reactivated + Cancelled Again
-    "Reactivated Cancelled Again": """
-        SELECT 
-            COALESCE(DSC.course_slug, 'Unknown') AS course_slug,
-            COUNT(DISTINCT CS.value__meta_data_lead_id) AS cancelled_again
-        FROM data_marts.combined_subscriptions CS
-        LEFT JOIN data_warehouse.dim_schedules DSC 
-            ON CS.value__meta_data_lead_id = DSC.student_id 
-           AND DSC.registered_on >= CS.reactivated_on
-        WHERE CS.reactivated_on BETWEEN '{start_date}' AND '{end_date}'
-          AND CS.cancelled_after_reactivation = TRUE
-        GROUP BY COALESCE(DSC.course_slug, 'Unknown')
-        ORDER BY cancelled_again DESC;
-    """
 }
 
 
 
 # ---- SQL Queries ----
 revenue_queries = {
+
+        "Post Reactivation Revenue": """
+    SELECT
+    SUM(converted_amount) AS post_reactivation_revenue
+    FROM data_marts.combined_transactions
+    WHERE payment_date BETWEEN '{start_date}' AND '{end_date}'
+    AND converted_amount > 0
+    AND reactivated_on IS NOT NULL
+    AND payment_date > reactivated_on;
+    """,
     # Core Metrics
     "Total Revenue": """SELECT SUM(converted_amount) AS total_revenue FROM data_marts.combined_transactions WHERE payment_date BETWEEN '{start_date}' AND '{end_date}' AND converted_amount > 0;""",
     "Unique Buyers": """SELECT COUNT(DISTINCT student_id) AS unique_buyers FROM data_marts.combined_transactions WHERE payment_date BETWEEN '{start_date}' AND '{end_date}' AND converted_amount > 0 AND student_id IS NOT NULL;""",
@@ -1719,10 +1645,6 @@ if run_button:
                     st.markdown(f"🔗 **Top UTM Source:** `{top_row['utm_source']}` with `{top_row[df.columns[1]]:,}` users")
                 if "Offer Type" in metric_name:
                     st.markdown(f"🏷️ **Top Offer Type:** `{top_row['offer_type']}` with `{top_row[df.columns[1]]:,}` users")
-                if "Cancelled Again" in metric_name:
-                    st.markdown(f"❌ **Top Course for Repeat Cancellations:** `{top_row['course_slug']}` with `{top_row['cancelled_again']:,}` users")
-                if "Full Attendance" in metric_name:
-                    st.markdown(f"🏆 **Top Full Attendance Course:** `{top_row['course_slug']}` with `{top_row['full_attendance_users']:,}` users")
 
                 # --- Chart (Bar or Line auto-detect) ---
                 numeric_cols = [col for col in df.columns if df[col].dtype != 'object']
@@ -1751,66 +1673,123 @@ if run_button:
 
         # -- Top Summary Metrics --
         with st.spinner("Loading summary metrics..."):
-            total_revenue = run_query9(revenue_queries["Total Revenue"], start_date, end_date).iloc[0, 0]
-            unique_buyers = run_query9(revenue_queries["Unique Buyers"], start_date, end_date).iloc[0, 0]
-            aov = run_query9(revenue_queries["Average Order Value (AOV)"], start_date, end_date).iloc[0, 0]
+            total_revenue = run_query(revenue_queries["Total Revenue"], start_date, end_date).iloc[0, 0]
+            unique_buyers = run_query(revenue_queries["Unique Buyers"], start_date, end_date).iloc[0, 0]
+            aov = run_query(revenue_queries["Average Order Value (AOV)"], start_date, end_date).iloc[0, 0]
 
             col1, col2, col3 = st.columns(3)
             col1.metric("💰 Total Revenue", f"{total_revenue:,.2f}")
             col2.metric("🧑‍🎓 Unique Buyers", f"{unique_buyers:,}")
             col3.metric("💳 AOV", f"{aov:,.2f}")
 
-        st.markdown("---")
+            st.markdown("---")
 
-        # -- Helper Function --
-        def display_chart_table(title, query_key, x_col=None, y_col=None, chart_type="bar"):
-            with st.spinner(f"Loading {title}..."):
-                df = run_query9(revenue_queries[query_key], start_date, end_date)
-                if not df.empty:
-                    st.subheader(title)
-                    st.dataframe(df)
-                    if x_col and y_col:
-                        if chart_type == "bar":
-                            fig = px.bar(df, x=x_col, y=y_col, text=y_col, title=title)
-                        else:
-                            fig = px.line(df, x=x_col, y=y_col, markers=True, title=title)
+            # -- Helper Function --
+            def display_chart_table(title, query_key, x_col=None, y_col=None, chart_type="bar"):
+                with st.spinner(f"Loading {title}..."):
+                    df = run_query(revenue_queries[query_key], start_date, end_date)
+                    if not df.empty:
+                        st.subheader(title)
+                        st.dataframe(df)
+                        if x_col and y_col:
+                            if chart_type == "bar":
+                                fig = px.bar(df, x=x_col, y=y_col, text=y_col, title=title)
+                            else:
+                                fig = px.line(df, x=x_col, y=y_col, markers=True, title=title)
+                            st.plotly_chart(fig, use_container_width=True)
+                        st.download_button(
+                            label=f"Download {title} CSV",
+                            data=df.to_csv(index=False).encode('utf-8'),
+                            file_name=f"{title.lower().replace(' ', '_')}.csv",
+                            mime="text/csv"
+                        )
+                        st.markdown("---")
+
+            # -- Revenue Splits --
+            rev1 = run_query(revenue_queries["Rev1 Revenue"], start_date, end_date).iloc[0, 0]
+            rev2 = run_query(revenue_queries["Rev2 Revenue"], start_date, end_date).iloc[0, 0]
+            rev3 = run_query(revenue_queries["Rev3 Revenue"], start_date, end_date).iloc[0, 0]
+            rev_split_df = pd.DataFrame({"Type": ["Rev1", "Rev2", "Rev3"], "Revenue": [rev1, rev2, rev3]})
+            st.subheader("Revenue Split: Rev1 / Rev2 / Rev3")
+            st.dataframe(rev_split_df)
+            fig_rev_split = px.pie(rev_split_df, names="Type", values="Revenue", title="Revenue Split")
+            st.plotly_chart(fig_rev_split, use_container_width=True)
+            st.markdown("---")
+
+            # --- Rev1 / Rev2 / Rev3 Description-Level Breakdown ---
+            st.subheader("🧩 Clean Revenue Breakdown by Rev1 / Rev2 / Rev3")
+
+            # Custom Query for Clean Descriptions
+            description_query = f"""
+            SELECT
+            CASE
+                WHEN plan_id IS NOT NULL THEN 'Rev1'
+                WHEN plan_id IS NULL AND description ILIKE '%lifetime%' THEN 'Rev2'
+                WHEN plan_id IS NULL AND description NOT ILIKE '%lifetime%' THEN 'Rev3'
+            END AS revenue_bucket,
+
+            TRIM(
+                REGEXP_REPLACE(
+                SPLIT_PART(description, ':', 1),
+                '.* - ',
+                ''
+                )
+            ) AS clean_description,
+
+            SUM(converted_amount) AS total_revenue,
+            COUNT(*) AS transaction_count
+
+            FROM data_marts.combined_transactions
+            WHERE payment_date BETWEEN '{start_date}' AND '{end_date}'
+            AND converted_amount > 0
+            GROUP BY 1, 2
+            ORDER BY revenue_bucket, total_revenue DESC;
+            """
+
+            # Run the query
+            description_df = run_query(description_query, start_date, end_date)
+
+            if not description_df.empty:
+                st.dataframe(description_df)
+
+                # Download Button
+                st.download_button(
+                    label="Download Description Breakdown CSV",
+                    data=description_df.to_csv(index=False).encode('utf-8'),
+                    file_name="description_breakdown.csv",
+                    mime="text/csv"
+                )
+
+                # Pie Charts for Each Revenue Bucket
+                for bucket in description_df['revenue_bucket'].unique():
+                    bucket_data = description_df[description_df['revenue_bucket'] == bucket]
+                    if not bucket_data.empty:
+                        st.markdown(f"### {bucket} Revenue Distribution")
+                        fig = px.pie(
+                            bucket_data,
+                            names='clean_description',
+                            values='total_revenue',
+                            title=f"{bucket} - Clean Description Revenue Split"
+                        )
                         st.plotly_chart(fig, use_container_width=True)
-                    st.download_button(
-                        label=f"Download {title} CSV",
-                        data=df.to_csv(index=False).encode('utf-8'),
-                        file_name=f"{title.lower().replace(' ', '_')}.csv",
-                        mime="text/csv"
-                    )
-                    st.markdown("---")
 
-        # -- Revenue Splits --
-        rev1 = run_query9(revenue_queries["Rev1 Revenue"], start_date, end_date).iloc[0, 0]
-        rev2 = run_query9(revenue_queries["Rev2 Revenue"], start_date, end_date).iloc[0, 0]
-        rev3 = run_query9(revenue_queries["Rev3 Revenue"], start_date, end_date).iloc[0, 0]
-        rev_split_df = pd.DataFrame({"Type": ["Rev1", "Rev2", "Rev3"], "Revenue": [rev1, rev2, rev3]})
-        st.subheader("Revenue Split: Rev1 / Rev2 / Rev3")
-        st.dataframe(rev_split_df)
-        fig_rev_split = px.pie(rev_split_df, names="Type", values="Revenue", title="Revenue Split")
-        st.plotly_chart(fig_rev_split, use_container_width=True)
-        st.markdown("---")
+                st.markdown("---")
+            else:
+                st.warning("No data available for the selected period in description breakdown.")
+            # -- Breakdown Charts and Tables --
+            display_chart_table("Monthly Revenue Trend", "Monthly Revenue Trend", "month", "total_revenue", "line")
+            display_chart_table("Revenue by Country", "Revenue by Country", "country", "total_revenue")
+            display_chart_table("Revenue by Gender", "Revenue by Gender", "gender", "total_revenue")
+            display_chart_table("Revenue by Gateway", "Revenue by Gateway", "gateway", "total_revenue")
+            display_chart_table("Revenue by Brand", "Revenue by Brand", "brand", "total_revenue")
+            display_chart_table("Revenue by Currency", "Revenue by Currency", "currency", "total_revenue")
+            display_chart_table("Revenue by UTM Source", "Revenue by UTM Source", "utm_source", "total_revenue")
+            display_chart_table("Revenue by Registration Cohort", "Revenue by Registration Cohort", "registration_month", "total_revenue", "line")
+            display_chart_table("Top Spenders", "Top Spenders", "student_id", "total_revenue")
 
-        # -- Breakdown Charts and Tables --
-        display_chart_table("Monthly Revenue Trend", "Monthly Revenue Trend", "month", "total_revenue", "line")
-        display_chart_table("Revenue by Country", "Revenue by Country", "country", "total_revenue")
-        display_chart_table("Revenue by Gender", "Revenue by Gender", "gender", "total_revenue")
-        display_chart_table("Revenue by Gateway", "Revenue by Gateway", "gateway", "total_revenue")
-        display_chart_table("Revenue by Brand", "Revenue by Brand", "brand", "total_revenue")
-        display_chart_table("Revenue by Currency", "Revenue by Currency", "currency", "total_revenue")
-        display_chart_table("Revenue by UTM Source", "Revenue by UTM Source", "utm_source", "total_revenue")
-        display_chart_table("Revenue by Registration Cohort", "Revenue by Registration Cohort", "registration_month", "total_revenue", "line")
-        display_chart_table("Top Spenders", "Top Spenders", "student_id", "total_revenue")
 
-        display_chart_table("Revenue from First-Time Buyers", "Revenue from First-Time Buyers")
-        display_chart_table("Revenue from Returning Buyers", "Revenue from Returning Buyers")
-        display_chart_table("Partner Revenue", "Partner Revenue")
-        display_chart_table("Reactivation Revenue", "Reactivation Revenue")
 
-        st.success("✅ Revenue analysis complete!")
+            st.success("✅ Revenue analysis complete!")
 
 else:
     st.info("📅 Select a date range and click 'Run Analysis' to load data.")
