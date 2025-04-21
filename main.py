@@ -1028,7 +1028,7 @@ reactivation_queries_clean = {
 # ---- SQL Queries ----
 revenue_queries = {
 
-        "Post Reactivation Revenue": """
+    "Post Reactivation Revenue": """
     SELECT
     SUM(converted_amount) AS post_reactivation_revenue
     FROM data_marts.combined_transactions
@@ -1042,37 +1042,245 @@ revenue_queries = {
     "Unique Buyers": """SELECT COUNT(DISTINCT student_id) AS unique_buyers FROM data_marts.combined_transactions WHERE payment_date BETWEEN '{start_date}' AND '{end_date}' AND converted_amount > 0 AND student_id IS NOT NULL;""",
     "Average Order Value (AOV)": """SELECT SUM(converted_amount) / NULLIF(COUNT(transaction_id), 0) AS average_order_value FROM data_marts.combined_transactions WHERE payment_date BETWEEN '{start_date}' AND '{end_date}' AND converted_amount > 0;""",
     # Revenue splits
-    "Rev1 Revenue": """SELECT SUM(converted_amount) AS rev1_revenue FROM data_marts.combined_transactions WHERE payment_date BETWEEN '{start_date}' AND '{end_date}' AND converted_amount > 0 AND plan_id IS NOT NULL;""",
-    "Rev2 Revenue": """SELECT SUM(converted_amount) AS rev2_revenue FROM data_marts.combined_transactions WHERE payment_date BETWEEN '{start_date}' AND '{end_date}' AND converted_amount > 0 AND plan_id IS NULL AND description ILIKE '%lifetime%';""",
-    "Rev3 Revenue": """SELECT SUM(converted_amount) AS rev3_revenue FROM data_marts.combined_transactions WHERE payment_date BETWEEN '{start_date}' AND '{end_date}' AND converted_amount > 0 AND plan_id IS NULL AND description NOT ILIKE '%lifetime%';""",
-    "Partner Revenue": """SELECT SUM(converted_amount) AS partner_revenue FROM data_marts.combined_transactions WHERE payment_date BETWEEN '{start_date}' AND '{end_date}' AND converted_amount > 0 AND student_id IS NULL;""",
-    "Reactivation Revenue": """SELECT SUM(converted_amount) AS reactivation_revenue FROM data_marts.combined_transactions WHERE payment_date BETWEEN '{start_date}' AND '{end_date}' AND converted_amount > 0 AND reactivated_on IS NOT NULL;""",
+    "Rev1 Revenue":
+      """SELECT SUM(converted_amount) AS rev1_revenue
+FROM data_marts.combined_transactions
+WHERE payment_date BETWEEN '{start_date}' AND '{end_date}'
+  AND converted_amount > 0
+  AND plan_id IS NOT NULL;""",
+
+
+    "Rev2 Revenue": """SELECT SUM(converted_amount) AS rev2_revenue
+FROM data_marts.combined_transactions
+WHERE payment_date BETWEEN '{start_date}' AND '{end_date}'
+  AND converted_amount > 0
+  AND description ILIKE '%lifetime%';""",
+
+  
+    "Rev3 Revenue": """SELECT SUM(converted_amount) AS rev3_revenue
+FROM data_marts.combined_transactions
+WHERE payment_date BETWEEN '{start_date}' AND '{end_date}'
+  AND converted_amount > 0
+  AND (
+    description ILIKE '%course%' OR
+    description ILIKE '%toolkit%' OR
+    description ILIKE '%hard%'
+  );
+""",
+
+# Rev1 Revenue by Plan ID
+    "Rev1 Revenue by Plan ID": """
+    SELECT 
+      plan_id,
+      SUM(converted_amount) AS rev1_revenue
+    FROM data_marts.combined_transactions
+    WHERE payment_date BETWEEN '{start_date}' AND '{end_date}'
+      AND converted_amount > 0
+      AND plan_id IS NOT NULL
+    GROUP BY plan_id
+    ORDER BY rev1_revenue DESC;
+    """,
+
+    # Rev2 Revenue by Lifetime Descriptions
+    "Rev2 Revenue by Description": """
+    SELECT 
+      description,
+      SUM(converted_amount) AS rev2_revenue
+    FROM data_marts.combined_transactions
+    WHERE payment_date BETWEEN '{start_date}' AND '{end_date}'
+      AND converted_amount > 0
+      AND plan_id IS NULL
+      AND description ILIKE '%lifetime%'
+    GROUP BY description
+    ORDER BY rev2_revenue DESC;
+    """,
+
+    # Rev3 Revenue by Subtype (Course, Toolkit, Hard)
+    "Rev3 Revenue by Type": """
+    SELECT 
+      CASE
+        WHEN description ILIKE '%course%' THEN 'Course'
+        WHEN description ILIKE '%toolkit%' THEN 'Toolkit'
+        WHEN description ILIKE '%hard%' THEN 'Hardcopy'
+        ELSE 'Other'
+      END AS rev3_type,
+      SUM(converted_amount) AS rev3_revenue
+    FROM data_marts.combined_transactions
+    WHERE payment_date BETWEEN '{start_date}' AND '{end_date}'
+      AND converted_amount > 0
+      AND plan_id IS NULL
+      AND (
+        description ILIKE '%course%' OR
+        description ILIKE '%toolkit%' OR
+        description ILIKE '%hard%'
+      )
+    GROUP BY rev3_type
+    ORDER BY rev3_revenue DESC;
+    """,
+    "Partner Revenue": """SELECT SUM(converted_amount) AS partner_revenue 
+    FROM data_marts.combined_transactions WHERE payment_date BETWEEN '{start_date}' AND '{end_date}' 
+    AND converted_amount > 0 AND student_id IS NULL;""",
+
+
+    "Reactivation Revenue": """SELECT SUM(converted_amount) AS reactivation_revenue FROM data_marts.combined_transactions
+     WHERE payment_date BETWEEN '{start_date}' AND '{end_date}' AND converted_amount > 0 AND reactivated_on IS NOT NULL;""",
     # Time Trends
-    "Monthly Revenue Trend": """SELECT DATE_TRUNC('month', payment_date) AS month, SUM(converted_amount) AS total_revenue FROM data_marts.combined_transactions WHERE payment_date BETWEEN '{start_date}' AND '{end_date}' AND converted_amount > 0 GROUP BY month ORDER BY month;""",
+    "Monthly Revenue Trend": """SELECT DATE_TRUNC('month', payment_date) AS month, SUM(converted_amount) AS 
+    total_revenue FROM data_marts.combined_transactions WHERE payment_date BETWEEN '{start_date}' AND '{end_date}' 
+    AND converted_amount > 0 GROUP BY month ORDER BY month;""",
     # Demographics
-    "Revenue by Country": """SELECT ds.country, SUM(ct.converted_amount) AS total_revenue FROM data_marts.combined_transactions ct JOIN data_warehouse.dim_students ds ON ct.student_id = ds.student_id WHERE ct.payment_date BETWEEN '{start_date}' AND '{end_date}' AND ct.converted_amount > 0 AND ct.value__refunded_txn_id IS NULL GROUP BY ds.country ORDER BY total_revenue DESC;""",
-    "Revenue by Gender": """SELECT ds.gender, SUM(ct.converted_amount) AS total_revenue FROM data_marts.combined_transactions ct JOIN data_warehouse.dim_students ds ON ct.student_id = ds.student_id WHERE ct.payment_date BETWEEN '{start_date}' AND '{end_date}' AND ct.converted_amount > 0 AND ct.value__refunded_txn_id IS NULL GROUP BY ds.gender ORDER BY total_revenue DESC;""",
-    "Revenue by Gateway": """SELECT gateway, SUM(converted_amount) AS total_revenue FROM data_marts.combined_transactions WHERE payment_date BETWEEN '{start_date}' AND '{end_date}' AND converted_amount > 0 GROUP BY gateway ORDER BY total_revenue DESC;""",
-    "Revenue by Brand": """SELECT brand, SUM(converted_amount) AS total_revenue FROM data_marts.combined_transactions WHERE payment_date BETWEEN '{start_date}' AND '{end_date}' AND converted_amount > 0 GROUP BY brand ORDER BY total_revenue DESC;""",
-    "Revenue by Currency": """SELECT currency, SUM(converted_amount) AS total_revenue FROM data_marts.combined_transactions WHERE payment_date BETWEEN '{start_date}' AND '{end_date}' AND converted_amount > 0 GROUP BY currency ORDER BY total_revenue DESC;""",
+    "Revenue by Country": """SELECT ds.country, SUM(ct.converted_amount) AS total_revenue FROM data_marts.combined_transactions 
+    ct JOIN data_warehouse.dim_students ds ON ct.student_id = ds.student_id WHERE ct.payment_date BETWEEN '{start_date}' AND '{end_date}' AND 
+    ct.converted_amount > 0 AND ct.value__refunded_txn_id IS NULL GROUP BY ds.country ORDER BY total_revenue DESC;""",
+
+
+    "Revenue by Gender": """SELECT
+  COALESCE(LOWER(TRIM(ds.gender)), 'unknown') AS gender,
+  SUM(ct.converted_amount) AS total_revenue
+FROM data_marts.combined_transactions ct
+JOIN data_warehouse.dim_students ds
+  ON ct.student_id = ds.student_id
+WHERE ct.payment_date BETWEEN '{start_date}' AND '{end_date}'
+  AND ct.converted_amount > 0
+  AND ct.value__refunded_txn_id IS NULL
+GROUP BY COALESCE(LOWER(TRIM(ds.gender)), 'unknown')
+ORDER BY total_revenue DESC;""",
+
+    "Revenue by Gateway": """SELECT gateway, SUM(converted_amount) AS total_revenue FROM data_marts.combined_transactions WHERE
+      payment_date BETWEEN '{start_date}' AND '{end_date}' AND converted_amount > 0 GROUP BY gateway ORDER BY total_revenue DESC;""",
+
+    "Revenue by Brand": """SELECT brand, SUM(converted_amount) AS total_revenue FROM data_marts.combined_transactions WHERE
+      payment_date BETWEEN '{start_date}' AND '{end_date}' AND converted_amount > 0 GROUP BY brand ORDER BY total_revenue DESC;""",
+    "Revenue by Currency": """SELECT currency, SUM(converted_amount) AS total_revenue FROM data_marts.combined_transactions WHERE
+      payment_date BETWEEN '{start_date}' AND '{end_date}' AND converted_amount > 0 GROUP BY currency ORDER BY total_revenue DESC;""",
   ##  "Revenue by UTM Source": """SELECT cs.value__utm_source AS utm_source, SUM(ct.converted_amount) AS total_revenue FROM data_marts.combined_transactions ct JOIN data_marts.combined_subscriptions cs ON ct.subscription_id = cs.id WHERE ct.payment_date BETWEEN '{start_date}' AND '{end_date}' AND ct.converted_amount > 0 AND ct.value__refunded_txn_id IS NULL GROUP BY cs.value__utm_source ORDER BY total_revenue DESC;""",
-    "Revenue by UTM Source": """
-    SELECT ds.latest_utm_source AS utm_source,
-           SUM(ct.converted_amount) AS total_revenue
-    FROM data_marts.combined_transactions ct
-    JOIN data_warehouse.dim_students ds ON ct.student_id = ds.student_id
-    WHERE ct.payment_date BETWEEN '{start_date}' AND '{end_date}'
-      AND ct.converted_amount > 0
-      AND ct.value__refunded_txn_id IS NULL
-    GROUP BY ds.latest_utm_source
-    ORDER BY total_revenue DESC;
+
+"Revenue by Partner Identifier": """
+SELECT 
+  ds.profile__partner_identifier AS partner_identifier,
+  SUM(ct.converted_amount) AS total_revenue
+FROM data_marts.combined_transactions ct
+JOIN data_warehouse.dim_students ds 
+  ON ct.student_id = ds.student_id
+WHERE ct.payment_date BETWEEN '{start_date}' AND '{end_date}'
+  AND ct.converted_amount > 0
+  AND ct.value__refunded_txn_id IS NULL
+GROUP BY ds.profile__partner_identifier
+ORDER BY total_revenue DESC;
+""",
+"Refund Revenue": """
+SELECT
+  SUM(converted_amount) AS total_refunded
+FROM data_marts.combined_transactions
+WHERE payment_date BETWEEN '{start_date}' AND '{end_date}'
+  AND converted_amount > 0
+  AND value__refunded_txn_id IS NOT NULL;
 """,
     # Buyer Types
-    "Revenue from First-Time Buyers": """SELECT SUM(ct.converted_amount) AS first_time_buyer_revenue FROM data_marts.combined_transactions ct WHERE ct.payment_date BETWEEN '{start_date}' AND '{end_date}' AND ct.converted_amount > 0 AND ct.value__refunded_txn_id IS NULL AND ct.student_id NOT IN (SELECT DISTINCT student_id FROM data_marts.combined_transactions WHERE payment_date < '{start_date}' AND converted_amount > 0 AND student_id IS NOT NULL);""",
-    "Revenue from Returning Buyers": """SELECT SUM(ct.converted_amount) AS returning_buyer_revenue FROM data_marts.combined_transactions ct WHERE ct.payment_date BETWEEN '{start_date}' AND '{end_date}' AND ct.converted_amount > 0 AND ct.value__refunded_txn_id IS NULL AND ct.student_id IN (SELECT DISTINCT student_id FROM data_marts.combined_transactions WHERE payment_date < '{start_date}' AND converted_amount > 0 AND student_id IS NOT NULL);""",
-    "Revenue by Registration Cohort": """SELECT DATE_TRUNC('month', ds.created_date) AS registration_month, SUM(ct.converted_amount) AS total_revenue FROM data_marts.combined_transactions ct JOIN data_warehouse.dim_students ds ON ct.student_id = ds.student_id WHERE ct.payment_date BETWEEN '{start_date}' AND '{end_date}' AND ct.converted_amount > 0 AND ct.value__refunded_txn_id IS NULL GROUP BY registration_month ORDER BY registration_month;""",
+    "Revenue from First-Time Buyers": """SELECT SUM(ct.converted_amount) AS first_time_buyer_revenue FROM 
+    data_marts.combined_transactions ct WHERE ct.payment_date BETWEEN '{start_date}' AND '{end_date}' 
+    AND ct.converted_amount > 0 AND ct.value__refunded_txn_id IS NULL AND 
+    ct.student_id NOT IN (SELECT DISTINCT student_id FROM data_marts.combined_transactions WHERE payment_date < '{start_date}' AND converted_amount > 0 AND student_id IS NOT NULL);""",
+    "Revenue from Returning Buyers": """SELECT SUM(ct.converted_amount) AS returning_buyer_revenue FROM 
+    data_marts.combined_transactions ct WHERE ct.payment_date BETWEEN '{start_date}' AND '{end_date}' AND ct.converted_amount > 0 AND ct.value__refunded_txn_id IS NULL AND ct.student_id IN (SELECT DISTINCT student_id FROM data_marts.combined_transactions WHERE payment_date < '{start_date}' AND converted_amount > 0 AND student_id IS NOT NULL);""",
+    "Revenue by Registration Cohort": """SELECT DATE_TRUNC('month', ds.created_date) AS registration_month,
+      SUM(ct.converted_amount) AS total_revenue FROM data_marts.combined_transactions ct JOIN data_warehouse.dim_students ds ON ct.student_id = ds.student_id WHERE ct.payment_date BETWEEN '{start_date}' AND '{end_date}' AND ct.converted_amount > 0 AND ct.value__refunded_txn_id IS NULL GROUP BY registration_month ORDER BY registration_month;""",
     "Top Spenders": """SELECT student_id, SUM(converted_amount) AS total_revenue FROM data_marts.combined_transactions WHERE payment_date BETWEEN '{start_date}' AND '{end_date}' AND converted_amount > 0 AND student_id IS NOT NULL GROUP BY student_id ORDER BY total_revenue DESC LIMIT 10;"""
+,
+
+"Revenue Logic Breakdown": """
+SELECT
+  CASE
+    WHEN description ILIKE '%lifetime%' THEN 'Rev2'
+    WHEN description ILIKE '%course%' OR description ILIKE '%toolkit%' OR description ILIKE '%hard%' THEN 'Rev3'
+    WHEN plan_id IS NOT NULL THEN 'Rev1'
+    ELSE 'Other'
+  END AS revenue_type,
+  SUM(converted_amount) AS revenue
+FROM data_marts.combined_transactions
+WHERE payment_date BETWEEN '{start_date}' AND '{end_date}'
+  AND converted_amount > 0
+  AND value__refunded_txn_id IS NULL
+GROUP BY 1
+ORDER BY revenue DESC;
+""",
+
+"Revenue by Partner Identifier and Type": """
+SELECT
+  ds.profile__partner_identifier AS partner_identifier,
+  CASE
+    WHEN ct.description ILIKE '%lifetime%' THEN 'Rev2'
+    WHEN ct.description ILIKE '%course%' OR ct.description ILIKE '%toolkit%' OR ct.description ILIKE '%hard%' THEN 'Rev3'
+    WHEN ct.plan_id IS NOT NULL THEN 'Rev1'
+    ELSE 'Other'
+  END AS revenue_category,
+  SUM(ct.converted_amount) AS total_revenue
+FROM data_marts.combined_transactions ct
+JOIN data_warehouse.dim_students ds
+  ON ct.student_id = ds.student_id
+WHERE ct.payment_date BETWEEN '{start_date}' AND '{end_date}'
+  AND ct.converted_amount > 0
+  AND ct.value__refunded_txn_id IS NULL
+GROUP BY ds.profile__partner_identifier, revenue_category
+ORDER BY ds.profile__partner_identifier, revenue_category;
+"""
+
 }
+
+
+
+revenue_queries["Rev1 Breakdown by Description"] = """
+SELECT
+  description,
+  SUM(converted_amount) AS rev1_revenue
+FROM data_marts.combined_transactions
+WHERE payment_date BETWEEN '{start_date}' AND '{end_date}'
+  AND converted_amount > 0
+  AND value__refunded_txn_id IS NULL
+  AND plan_id IS NOT NULL
+  AND description NOT ILIKE '%lifetime%'
+  AND description NOT ILIKE '%course%'
+  AND description NOT ILIKE '%toolkit%'
+  AND description NOT ILIKE '%hard%'
+GROUP BY description
+ORDER BY rev1_revenue DESC;
+"""
+
+revenue_queries["Rev2 Breakdown by Description"] = """
+SELECT
+  description,
+  SUM(converted_amount) AS rev2_revenue
+FROM data_marts.combined_transactions
+WHERE payment_date BETWEEN '{start_date}' AND '{end_date}'
+  AND converted_amount > 0
+  AND value__refunded_txn_id IS NULL
+  AND description ILIKE '%lifetime%'
+GROUP BY description
+ORDER BY rev2_revenue DESC;
+"""
+
+revenue_queries["Rev3 Breakdown by Type"] = """
+SELECT
+  CASE
+    WHEN description ILIKE '%course%' THEN 'Course'
+    WHEN description ILIKE '%toolkit%' THEN 'Toolkit'
+    WHEN description ILIKE '%hard%' THEN 'Hardcopy'
+    ELSE 'Other'
+  END AS rev3_type,
+  SUM(converted_amount) AS rev3_revenue
+FROM data_marts.combined_transactions
+WHERE payment_date BETWEEN '{start_date}' AND '{end_date}'
+  AND converted_amount > 0
+  AND value__refunded_txn_id IS NULL
+  AND plan_id IS NULL
+  AND (
+    description ILIKE '%course%' OR
+    description ILIKE '%toolkit%' OR
+    description ILIKE '%hard%'
+  )
+GROUP BY rev3_type
+ORDER BY rev3_revenue DESC;
+"""
 
 # Streamlit layout config
 st.set_page_config(page_title="Lead to CC Funnel", layout="wide")
@@ -1106,7 +1314,7 @@ if run_button:
 
     # Tabs for breakdowns
     tab1, tab2, tab3, tab4,tab5,tab6,tab7,tab8,tab9 = st.tabs([
-        "📥 Total Leads",
+        "✅Revenue ","📥 Total Leads",
         "🎯 Qualified Leads",
         "🔁 Infographics",
         "❌ Cancelled Leads",
@@ -1114,10 +1322,116 @@ if run_button:
         "📥 Attendance",
         "💡Lesson",
         "🚀Reactivated",
-        "✅Revenue "
+        
     ])
 
     with tab1:
+        st.header("📊 Revenue Tab Insights")
+
+        # -- Top Summary Metrics --
+        with st.spinner("Loading summary metrics..."):    
+            total_revenue = run_query(revenue_queries["Total Revenue"], start_date, end_date).iloc[0, 0]
+            unique_buyers = run_query(revenue_queries["Unique Buyers"], start_date, end_date).iloc[0, 0]
+            aov = run_query(revenue_queries["Average Order Value (AOV)"], start_date, end_date).iloc[0, 0]
+            refunds = run_query(revenue_queries["Refund Revenue"], start_date, end_date).iloc[0, 0]
+            refunds = refunds if refunds is not None else 0.0  # handle nulls
+            net_revenue = total_revenue - refunds  # safe subtraction
+
+            col1, col2, col3,col4,col5 = st.columns(5)
+            col1.metric("💰 Total Revenue", f"€{total_revenue:,.2f}")
+            col2.metric("🔁 Refunds", f"€{refunds:,.2f}")
+            col3.metric("🧮 Net Revenue", f"€{net_revenue:,.2f}")
+            col4.metric("🧑‍🏫 Unique Buyers", f"{unique_buyers:,}")
+            col5.metric("💳 AOV", f"{aov:,.2f}")
+
+            def display_chart_table(title, query_key, x_col=None, y_col=None, chart_type="bar"):
+                with st.spinner(f"Loading {title}..."):
+                    df = run_query(revenue_queries[query_key], start_date, end_date)
+                        # 🔢 Round all numeric columns to 2 decimal places
+                    df = df.round(2)
+                    
+                    if not df.empty:
+                        st.subheader(title)
+                        col1, col2 = st.columns([1, 2])
+
+                        with col1:
+                            st.dataframe(df)
+                            st.download_button(
+                                label=f"Download {title} CSV",
+                                data=df.to_csv(index=False).encode('utf-8'),
+                                file_name=f"{title.lower().replace(' ', '_')}.csv",
+                                mime="text/csv"
+                            )
+
+                        if x_col and y_col:
+                            with col2:
+                                if chart_type == "bar":
+                                    fig = px.bar(df, x=x_col, y=y_col, text=y_col, title=title)
+                                    fig.update_traces(textposition="outside")
+                                else:
+                                    fig = px.line(df, x=x_col, y=y_col, markers=True, title=title)
+                                st.plotly_chart(fig, use_container_width=True)
+
+                        st.markdown("---")
+
+
+                    # 🔍 Display Logic-Based Rev1/2/3 Split
+            logic_rev_df = run_query(revenue_queries["Revenue Logic Breakdown"], start_date, end_date).round(2)
+
+            # Add total row
+            total_row = pd.DataFrame([{
+                "revenue_type": "Total",
+                "revenue": logic_rev_df["revenue"].sum()
+            }])
+            logic_rev_df = pd.concat([logic_rev_df, total_row], ignore_index=True)
+
+            st.subheader("📊 Revenue Breakdown: Rev1 / Rev2 / Rev3 (Logic-Based)")
+            col1, col2 = st.columns([1, 2])
+            with col1:
+                st.dataframe(logic_rev_df)
+                st.download_button(
+                    label="Download Rev1/2/3 Logic Breakdown",
+                    data=logic_rev_df.to_csv(index=False).encode('utf-8'),
+                    file_name="revenue_logic_breakdown.csv",
+                    mime="text/csv"
+                )
+            with col2:
+                fig = px.pie(
+                    logic_rev_df[logic_rev_df["revenue_type"] != "Total"],
+                    names="revenue_type",
+                    values="revenue",
+                    title="Logic-Based Revenue Split"
+                )
+                st.plotly_chart(fig, use_container_width=True)
+
+            st.markdown("---")
+                    # --- Detailed Rev Breakdown Based on Logic Image ---
+            st.subheader("🔍 Detailed Revenue Splits by Logic")
+
+            display_chart_table("Rev1 Breakdown by Description", "Rev1 Breakdown by Description", "description", "rev1_revenue")
+            display_chart_table("Rev2 Breakdown by Description", "Rev2 Breakdown by Description", "description", "rev2_revenue")
+            display_chart_table("Rev3 Breakdown by Type", "Rev3 Breakdown by Type", "rev3_type", "rev3_revenue")
+            st.markdown("---")
+            # Detailed and Other Tables
+            display_chart_table("Revenue by Partner Identifier", "Revenue by Partner Identifier", "partner_identifier", "total_revenue")
+            display_chart_table("Revenue by Partner Identifier and Type","Revenue by Partner Identifier and Type",x_col="partner_identifier",y_col="total_revenue",chart_type="bar")
+            display_chart_table("Revenue by Registration Cohort", "Revenue by Registration Cohort", "registration_month", "total_revenue", "line")
+            display_chart_table("Top Spenders", "Top Spenders", "student_id", "total_revenue")
+            display_chart_table("Revenue from First-Time Buyers", "Revenue from First-Time Buyers")
+            display_chart_table("Revenue from Returning Buyers", "Revenue from Returning Buyers")
+            display_chart_table("Partner Revenue", "Partner Revenue")
+            display_chart_table("Reactivation Revenue", "Reactivation Revenue")
+            display_chart_table("Post Reactivation Revenue", "Post Reactivation Revenue")
+            display_chart_table("Monthly Revenue Trend", "Monthly Revenue Trend", "month", "total_revenue", "line")
+            display_chart_table("Revenue by Country", "Revenue by Country", "country", "total_revenue")
+            display_chart_table("Revenue by Gender", "Revenue by Gender", "gender", "total_revenue")
+            display_chart_table("Revenue by Gateway", "Revenue by Gateway", "gateway", "total_revenue")
+            display_chart_table("Revenue by Brand", "Revenue by Brand", "brand", "total_revenue")
+            display_chart_table("Revenue by Currency", "Revenue by Currency", "currency", "total_revenue")
+
+            st.success("✅ Revenue analysis complete!")
+
+    with tab2:
             st.subheader("📊 Breakdown of Total Leads")
             st.metric("📥 Total Leads (All Sources)", f"{total:,}")
         ##   by_utm_medium=run_query(SQL["total_leads_utm_medium"] ,start_date, end_date)
@@ -1184,7 +1498,7 @@ if run_button:
                     st.plotly_chart(fig_age, use_container_width=True)
                         
 
-    with tab2:
+    with tab3:
             st.subheader("🎯 Breakdown of Qualified Leads")
             st.metric("🎯 Qualified Leads (All Sources)", f"{qualified:,}")
 
@@ -1267,7 +1581,7 @@ if run_button:
                 st.plotly_chart(fig, use_container_width=True)
 
 
-    with tab3:
+    with tab4:
             leads_df = run_query3(sql_mom["leads_mom"], start_date, end_date)
             qualified_df = run_query3(sql_mom["qualified_mom"], start_date, end_date)
             cancelled_df = run_query3(sql_mom["cancelled_mom"], start_date, end_date)
@@ -1297,7 +1611,7 @@ if run_button:
             st.plotly_chart(fig4, use_container_width=True)
 
         
-    with tab4:
+    with tab5:
             st.subheader("❌ Cancellations Breakdown")
 
             cancelled_total = run_query(cancelled_leads_queries["cancelled_total"], start_date, end_date).iloc[0, 0]
@@ -1345,7 +1659,7 @@ if run_button:
             chart_table("📘 Cancelled by Course Picked", cancelled_by_course, "coursepicked", "cancelled_leads")
             chart_table("👥 Cancelled by Age Group", cancelled_by_age, "age_bucket", "cancelled_leads")
 
-    with tab5:
+    with tab6:
         st.subheader("📝 Registrations Overview")
 
         # --- General Registrations Queries ---
@@ -1444,7 +1758,7 @@ if run_button:
         display_metric("📘 Lead Registrations by Course Slug", lead_course, "course_name", "total_registrations")
 
     
-    with tab6:
+    with tab7:
         st.subheader("🎥 Attendance Analysis: Leads & CC View (Side by Side)")
 
         # Define both views
@@ -1526,7 +1840,7 @@ if run_button:
             st.markdown("---")
 
 
-    with tab7:
+    with tab8:
         st.title("🎓 Lesson-Level Attendance Analysis")
 
         # -------------------------------
@@ -1619,7 +1933,7 @@ if run_button:
 
             st.markdown("---")
 
-    with tab8:
+    with tab9:
         st.title("♻️ Reactivations Analysis (Clean — Post Reactivation Only)")
 
                 # Load data from your clean SQL dictionary
@@ -1668,129 +1982,8 @@ if run_button:
                     mime='text/csv',
                 )
 
-    with tab9:
-        st.header("📊 Revenue Tab Insights")
 
-        # -- Top Summary Metrics --
-        with st.spinner("Loading summary metrics..."):
-            total_revenue = run_query(revenue_queries["Total Revenue"], start_date, end_date).iloc[0, 0]
-            unique_buyers = run_query(revenue_queries["Unique Buyers"], start_date, end_date).iloc[0, 0]
-            aov = run_query(revenue_queries["Average Order Value (AOV)"], start_date, end_date).iloc[0, 0]
-
-            col1, col2, col3 = st.columns(3)
-            col1.metric("💰 Total Revenue", f"{total_revenue:,.2f}")
-            col2.metric("🧑‍🎓 Unique Buyers", f"{unique_buyers:,}")
-            col3.metric("💳 AOV", f"{aov:,.2f}")
-
-            st.markdown("---")
-
-            # -- Helper Function --
-            def display_chart_table(title, query_key, x_col=None, y_col=None, chart_type="bar"):
-                with st.spinner(f"Loading {title}..."):
-                    df = run_query(revenue_queries[query_key], start_date, end_date)
-                    if not df.empty:
-                        st.subheader(title)
-                        st.dataframe(df)
-                        if x_col and y_col:
-                            if chart_type == "bar":
-                                fig = px.bar(df, x=x_col, y=y_col, text=y_col, title=title)
-                            else:
-                                fig = px.line(df, x=x_col, y=y_col, markers=True, title=title)
-                            st.plotly_chart(fig, use_container_width=True)
-                        st.download_button(
-                            label=f"Download {title} CSV",
-                            data=df.to_csv(index=False).encode('utf-8'),
-                            file_name=f"{title.lower().replace(' ', '_')}.csv",
-                            mime="text/csv"
-                        )
-                        st.markdown("---")
-
-            # -- Revenue Splits --
-            rev1 = run_query(revenue_queries["Rev1 Revenue"], start_date, end_date).iloc[0, 0]
-            rev2 = run_query(revenue_queries["Rev2 Revenue"], start_date, end_date).iloc[0, 0]
-            rev3 = run_query(revenue_queries["Rev3 Revenue"], start_date, end_date).iloc[0, 0]
-            rev_split_df = pd.DataFrame({"Type": ["Rev1", "Rev2", "Rev3"], "Revenue": [rev1, rev2, rev3]})
-            st.subheader("Revenue Split: Rev1 / Rev2 / Rev3")
-            st.dataframe(rev_split_df)
-            fig_rev_split = px.pie(rev_split_df, names="Type", values="Revenue", title="Revenue Split")
-            st.plotly_chart(fig_rev_split, use_container_width=True)
-            st.markdown("---")
-
-            # --- Rev1 / Rev2 / Rev3 Description-Level Breakdown ---
-            st.subheader("🧩 Clean Revenue Breakdown by Rev1 / Rev2 / Rev3")
-
-            # Custom Query for Clean Descriptions
-            description_query = f"""
-            SELECT
-            CASE
-                WHEN plan_id IS NOT NULL THEN 'Rev1'
-                WHEN plan_id IS NULL AND description ILIKE '%lifetime%' THEN 'Rev2'
-                WHEN plan_id IS NULL AND description NOT ILIKE '%lifetime%' THEN 'Rev3'
-            END AS revenue_bucket,
-
-            TRIM(
-                REGEXP_REPLACE(
-                SPLIT_PART(description, ':', 1),
-                '.* - ',
-                ''
-                )
-            ) AS clean_description,
-
-            SUM(converted_amount) AS total_revenue,
-            COUNT(*) AS transaction_count
-
-            FROM data_marts.combined_transactions
-            WHERE payment_date BETWEEN '{start_date}' AND '{end_date}'
-            AND converted_amount > 0
-            GROUP BY 1, 2
-            ORDER BY revenue_bucket, total_revenue DESC;
-            """
-
-            # Run the query
-            description_df = run_query(description_query, start_date, end_date)
-
-            if not description_df.empty:
-                st.dataframe(description_df)
-
-                # Download Button
-                st.download_button(
-                    label="Download Description Breakdown CSV",
-                    data=description_df.to_csv(index=False).encode('utf-8'),
-                    file_name="description_breakdown.csv",
-                    mime="text/csv"
-                )
-
-                # Pie Charts for Each Revenue Bucket
-                for bucket in description_df['revenue_bucket'].unique():
-                    bucket_data = description_df[description_df['revenue_bucket'] == bucket]
-                    if not bucket_data.empty:
-                        st.markdown(f"### {bucket} Revenue Distribution")
-                        fig = px.pie(
-                            bucket_data,
-                            names='clean_description',
-                            values='total_revenue',
-                            title=f"{bucket} - Clean Description Revenue Split"
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
-
-                st.markdown("---")
-            else:
-                st.warning("No data available for the selected period in description breakdown.")
-            # -- Breakdown Charts and Tables --
-            display_chart_table("Monthly Revenue Trend", "Monthly Revenue Trend", "month", "total_revenue", "line")
-            display_chart_table("Revenue by Country", "Revenue by Country", "country", "total_revenue")
-            display_chart_table("Revenue by Gender", "Revenue by Gender", "gender", "total_revenue")
-            display_chart_table("Revenue by Gateway", "Revenue by Gateway", "gateway", "total_revenue")
-            display_chart_table("Revenue by Brand", "Revenue by Brand", "brand", "total_revenue")
-            display_chart_table("Revenue by Currency", "Revenue by Currency", "currency", "total_revenue")
-            display_chart_table("Revenue by UTM Source", "Revenue by UTM Source", "utm_source", "total_revenue")
-            display_chart_table("Revenue by Registration Cohort", "Revenue by Registration Cohort", "registration_month", "total_revenue", "line")
-            display_chart_table("Top Spenders", "Top Spenders", "student_id", "total_revenue")
-
-
-
-            st.success("✅ Revenue analysis complete!")
-
+   
 else:
     st.info("📅 Select a date range and click 'Run Analysis' to load data.")
 
