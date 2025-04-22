@@ -1131,7 +1131,7 @@ WHERE payment_date BETWEEN '{start_date}' AND '{end_date}'
     # Demographics
     "Revenue by Country": """SELECT ds.country, SUM(ct.converted_amount) AS total_revenue FROM data_marts.combined_transactions 
     ct JOIN data_warehouse.dim_students ds ON ct.student_id = ds.student_id WHERE ct.payment_date BETWEEN '{start_date}' AND '{end_date}' AND 
-    ct.converted_amount > 0 AND ct.value__refunded_txn_id IS NULL GROUP BY ds.country ORDER BY total_revenue DESC;""",
+    ct.converted_amount > 0  GROUP BY ds.country ORDER BY total_revenue DESC;""",
 
 
     "Revenue by Gender": """SELECT
@@ -1142,7 +1142,6 @@ JOIN data_warehouse.dim_students ds
   ON ct.student_id = ds.student_id
 WHERE ct.payment_date BETWEEN '{start_date}' AND '{end_date}'
   AND ct.converted_amount > 0
-  AND ct.value__refunded_txn_id IS NULL
 GROUP BY COALESCE(LOWER(TRIM(ds.gender)), 'unknown')
 ORDER BY total_revenue DESC;""",
 
@@ -1153,7 +1152,7 @@ ORDER BY total_revenue DESC;""",
       payment_date BETWEEN '{start_date}' AND '{end_date}' AND converted_amount > 0 GROUP BY brand ORDER BY total_revenue DESC;""",
     "Revenue by Currency": """SELECT currency, SUM(converted_amount) AS total_revenue FROM data_marts.combined_transactions WHERE
       payment_date BETWEEN '{start_date}' AND '{end_date}' AND converted_amount > 0 GROUP BY currency ORDER BY total_revenue DESC;""",
-  ##  "Revenue by UTM Source": """SELECT cs.value__utm_source AS utm_source, SUM(ct.converted_amount) AS total_revenue FROM data_marts.combined_transactions ct JOIN data_marts.combined_subscriptions cs ON ct.subscription_id = cs.id WHERE ct.payment_date BETWEEN '{start_date}' AND '{end_date}' AND ct.converted_amount > 0 AND ct.value__refunded_txn_id IS NULL GROUP BY cs.value__utm_source ORDER BY total_revenue DESC;""",
+  ##  "Revenue by UTM Source": """SELECT cs.value__utm_source AS utm_source, SUM(ct.converted_amount) AS total_revenue FROM data_marts.combined_transactions ct JOIN data_marts.combined_subscriptions cs ON ct.subscription_id = cs.id WHERE ct.payment_date BETWEEN '{start_date}' AND '{end_date}' AND ct.converted_amount > 0  GROUP BY cs.value__utm_source ORDER BY total_revenue DESC;""",
 
 "Revenue by Partner Identifier": """
 SELECT 
@@ -1164,7 +1163,6 @@ JOIN data_warehouse.dim_students ds
   ON ct.student_id = ds.student_id
 WHERE ct.payment_date BETWEEN '{start_date}' AND '{end_date}'
   AND ct.converted_amount > 0
-  AND ct.value__refunded_txn_id IS NULL
 GROUP BY ds.profile__partner_identifier
 ORDER BY total_revenue DESC;
 """,
@@ -1200,7 +1198,6 @@ SELECT
 FROM data_marts.combined_transactions
 WHERE payment_date BETWEEN '{start_date}' AND '{end_date}'
   AND converted_amount > 0
-  AND value__refunded_txn_id IS NULL
 GROUP BY 1
 ORDER BY revenue DESC;
 """,
@@ -1220,7 +1217,6 @@ JOIN data_warehouse.dim_students ds
   ON ct.student_id = ds.student_id
 WHERE ct.payment_date BETWEEN '{start_date}' AND '{end_date}'
   AND ct.converted_amount > 0
-  AND ct.value__refunded_txn_id IS NULL
 GROUP BY ds.profile__partner_identifier, revenue_category
 ORDER BY ds.profile__partner_identifier, revenue_category;
 """
@@ -1236,7 +1232,6 @@ SELECT
 FROM data_marts.combined_transactions
 WHERE payment_date BETWEEN '{start_date}' AND '{end_date}'
   AND converted_amount > 0
-  AND value__refunded_txn_id IS NULL
   AND plan_id IS NOT NULL
   AND description NOT ILIKE '%lifetime%'
   AND description NOT ILIKE '%course%'
@@ -1253,7 +1248,6 @@ SELECT
 FROM data_marts.combined_transactions
 WHERE payment_date BETWEEN '{start_date}' AND '{end_date}'
   AND converted_amount > 0
-  AND value__refunded_txn_id IS NULL
   AND description ILIKE '%lifetime%'
 GROUP BY description
 ORDER BY rev2_revenue DESC;
@@ -1271,7 +1265,6 @@ SELECT
 FROM data_marts.combined_transactions
 WHERE payment_date BETWEEN '{start_date}' AND '{end_date}'
   AND converted_amount > 0
-  AND value__refunded_txn_id IS NULL
   AND plan_id IS NULL
   AND (
     description ILIKE '%course%' OR
