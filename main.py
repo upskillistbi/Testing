@@ -1307,7 +1307,7 @@ if run_button:
 
     # Tabs for breakdowns
     tab1, tab2, tab3, tab4,tab5,tab6,tab7,tab8,tab9 = st.tabs([
-        "✅Revenue ","📥 Total Leads",
+        "📥 Total Leads",
         "🎯 Qualified Leads",
         "🔁 Infographics",
         "❌ Cancelled Leads",
@@ -1315,10 +1315,11 @@ if run_button:
         "📥 Attendance",
         "💡Lesson",
         "🚀Reactivated",
+         "✅Revenue "
         
     ])
 
-    with tab1:
+    with tab9:
         st.header("📊 Revenue Tab Insights")
 
         # -- Top Summary Metrics --
@@ -1424,7 +1425,7 @@ if run_button:
 
             st.success("✅ Revenue analysis complete!")
 
-    with tab2:
+    with tab1:
             st.subheader("📊 Breakdown of Total Leads")
             st.metric("📥 Total Leads (All Sources)", f"{total:,}")
         ##   by_utm_medium=run_query(SQL["total_leads_utm_medium"] ,start_date, end_date)
@@ -1491,7 +1492,7 @@ if run_button:
                     st.plotly_chart(fig_age, use_container_width=True)
                         
 
-    with tab3:
+    with tab2:
             st.subheader("🎯 Breakdown of Qualified Leads")
             st.metric("🎯 Qualified Leads (All Sources)", f"{qualified:,}")
 
@@ -1574,7 +1575,7 @@ if run_button:
                 st.plotly_chart(fig, use_container_width=True)
 
 
-    with tab4:
+    with tab3:
             leads_df = run_query3(sql_mom["leads_mom"], start_date, end_date)
             qualified_df = run_query3(sql_mom["qualified_mom"], start_date, end_date)
             cancelled_df = run_query3(sql_mom["cancelled_mom"], start_date, end_date)
@@ -1604,7 +1605,7 @@ if run_button:
             st.plotly_chart(fig4, use_container_width=True)
 
         
-    with tab5:
+    with tab4:
             st.subheader("❌ Cancellations Breakdown")
 
             cancelled_total = run_query(cancelled_leads_queries["cancelled_total"], start_date, end_date).iloc[0, 0]
@@ -1652,7 +1653,7 @@ if run_button:
             chart_table("📘 Cancelled by Course Picked", cancelled_by_course, "coursepicked", "cancelled_leads")
             chart_table("👥 Cancelled by Age Group", cancelled_by_age, "age_bucket", "cancelled_leads")
 
-    with tab6:
+    with tab5:
         st.subheader("📝 Registrations Overview")
 
         # --- General Registrations Queries ---
@@ -1751,7 +1752,7 @@ if run_button:
         display_metric("📘 Lead Registrations by Course Slug", lead_course, "course_name", "total_registrations")
 
     
-    with tab7:
+    with tab6:
         st.subheader("🎥 Attendance Analysis: Leads & CC View (Side by Side)")
 
         # Define both views
@@ -1833,7 +1834,7 @@ if run_button:
             st.markdown("---")
 
 
-    with tab8:
+    with tab7:
         st.title("🎓 Lesson-Level Attendance Analysis")
 
         # -------------------------------
@@ -1926,7 +1927,7 @@ if run_button:
 
             st.markdown("---")
 
-    with tab9:
+    with tab8:
         st.title("♻️ Reactivations Analysis (Clean — Post Reactivation Only)")
 
                 # Load data from your clean SQL dictionary
