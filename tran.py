@@ -325,12 +325,19 @@ if run_button:
             first_time_revenue = run_query(revenue_queries["Revenue from First-Time Buyers"], start_date, end_date).iloc[0, 0] or 0.0
             returning_revenue = run_query(revenue_queries["Revenue from Returning Buyers"], start_date, end_date).iloc[0, 0] or 0.0
 
-            col1, col2, col3, col4, col5,col6,col7,col8 = st.columns(8)
+          # Row 1: 2 columns
+            col1, col2 = st.columns(2)
             col1.metric("💰 Total Revenue", f"€{total_revenue:,.2f}")
             col2.metric("🔁 Refunds", f"€{refunds:,.2f}")
+
+            # Row 2: 2 columns
+            col3, col4 = st.columns(2)
             col3.metric("🧮 Net Revenue", f"€{net_revenue:,.2f}")
             col4.metric("🧑‍🏫 Unique Buyers", f"{unique_buyers:,}")
-            col5.metric("💳 AOV", f"{aov:,.2f}")
+
+            # Row 3: 4 columns
+            col5, col6, col7, col8 = st.columns(4)
+            col5.metric("💳 AOV", f"€{aov:,.2f}")
             col6.metric("♻️ Reactivation Revenue", f"€{reactivation_revenue:,.2f}")
             col7.metric("🆕 Revenue from First-Time Buyers", f"€{first_time_revenue:,.2f}")
             col8.metric("🔁 Revenue from Returning Buyers", f"€{returning_revenue:,.2f}")
