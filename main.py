@@ -314,7 +314,46 @@ cancelled_leads_queries = {
         JOIN data_marts.combined_subscriptions cs ON ds.student_id = cs.value__meta_data_lead_id
         WHERE cs.cancellation_intiated_on BETWEEN '{start_date}' AND '{end_date}'
         GROUP BY 1 ORDER BY cancelled_leads DESC;
-    """
+    """,
+
+    "cancellation_reason_summary": """
+    SELECT 
+        TRIM(data__custom_data__cancellation_reason_code) AS cancellation_reason,
+        COUNT(*) AS cancellations
+    FROM data_marts.combined_subscriptions
+    WHERE cancellation_intiated_on BETWEEN '{start_date}' AND '{end_date}'
+      AND data__custom_data__cancellation_reason_code IS NOT NULL
+    GROUP BY cancellation_reason
+    ORDER BY cancellations DESC;
+""",
+
+"cancellation_reason_by_country": """
+    SELECT 
+        TRIM(cs.data__custom_data__cancellation_reason_code) AS cancellation_reason,
+        ds.country AS country,
+        COUNT(*) AS cancellations
+    FROM data_marts.combined_subscriptions cs
+    JOIN data_warehouse.dim_students ds 
+        ON cs.value__meta_data_lead_id = ds.student_id
+    WHERE cs.cancellation_intiated_on BETWEEN '{start_date}' AND '{end_date}'
+      AND cs.data__custom_data__cancellation_reason_code IS NOT NULL
+    GROUP BY cancellation_reason, country
+    ORDER BY cancellations DESC;
+""",
+
+"cancellation_reason_by_course": """
+    SELECT 
+        TRIM(cs.data__custom_data__cancellation_reason_code) AS cancellation_reason,
+        ds.course_slug,
+        COUNT(DISTINCT cs.id) AS cancellations
+    FROM data_marts.combined_subscriptions cs
+    JOIN data_warehouse.dim_schedules ds 
+        ON cs.value__meta_data_lead_id = ds.student_id
+    WHERE cs.cancellation_intiated_on BETWEEN '{start_date}' AND '{end_date}'
+      AND cs.data__custom_data__cancellation_reason_code IS NOT NULL
+    GROUP BY cancellation_reason, ds.course_slug
+    ORDER BY cancellations DESC;
+"""
 }
 
 
@@ -1319,112 +1358,6 @@ if run_button:
         
     ])
 
-    with tab9:
-        st.header("📊 Revenue Tab Insights")
-
-        # -- Top Summary Metrics --
-        with st.spinner("Loading summary metrics..."):    
-            total_revenue = run_query(revenue_queries["Total Revenue"], start_date, end_date).iloc[0, 0]
-            unique_buyers = run_query(revenue_queries["Unique Buyers"], start_date, end_date).iloc[0, 0]
-            aov = run_query(revenue_queries["Average Order Value (AOV)"], start_date, end_date).iloc[0, 0]
-            refunds = run_query(revenue_queries["Refund Revenue"], start_date, end_date).iloc[0, 0]
-            refunds = refunds if refunds is not None else 0.0  # handle nulls
-            net_revenue = total_revenue - refunds  # safe subtraction
-
-            col1, col2, col3,col4,col5 = st.columns(5)
-            col1.metric("💰 Total Revenue", f"€{total_revenue:,.2f}")
-            col2.metric("🔁 Refunds", f"€{refunds:,.2f}")
-            col3.metric("🧮 Net Revenue", f"€{net_revenue:,.2f}")
-            col4.metric("🧑‍🏫 Unique Buyers", f"{unique_buyers:,}")
-            col5.metric("💳 AOV", f"{aov:,.2f}")
-
-            def display_chart_table(title, query_key, x_col=None, y_col=None, chart_type="bar"):
-                with st.spinner(f"Loading {title}..."):
-                    df = run_query(revenue_queries[query_key], start_date, end_date)
-                        # 🔢 Round all numeric columns to 2 decimal places
-                    df = df.round(2)
-                    
-                    if not df.empty:
-                        st.subheader(title)
-                        col1, col2 = st.columns([1, 2])
-
-                        with col1:
-                            st.dataframe(df)
-                            st.download_button(
-                                label=f"Download {title} CSV",
-                                data=df.to_csv(index=False).encode('utf-8'),
-                                file_name=f"{title.lower().replace(' ', '_')}.csv",
-                                mime="text/csv"
-                            )
-
-                        if x_col and y_col:
-                            with col2:
-                                if chart_type == "bar":
-                                    fig = px.bar(df, x=x_col, y=y_col, text=y_col, title=title)
-                                    fig.update_traces(textposition="outside")
-                                else:
-                                    fig = px.line(df, x=x_col, y=y_col, markers=True, title=title)
-                                st.plotly_chart(fig, use_container_width=True)
-
-                        st.markdown("---")
-
-
-                    # 🔍 Display Logic-Based Rev1/2/3 Split
-            logic_rev_df = run_query(revenue_queries["Revenue Logic Breakdown"], start_date, end_date).round(2)
-
-            # Add total row
-            total_row = pd.DataFrame([{
-                "revenue_type": "Total",
-                "revenue": logic_rev_df["revenue"].sum()
-            }])
-            logic_rev_df = pd.concat([logic_rev_df, total_row], ignore_index=True)
-
-            st.subheader("📊 Revenue Breakdown: Rev1 / Rev2 / Rev3 (Logic-Based)")
-            col1, col2 = st.columns([1, 2])
-            with col1:
-                st.dataframe(logic_rev_df)
-                st.download_button(
-                    label="Download Rev1/2/3 Logic Breakdown",
-                    data=logic_rev_df.to_csv(index=False).encode('utf-8'),
-                    file_name="revenue_logic_breakdown.csv",
-                    mime="text/csv"
-                )
-            with col2:
-                fig = px.pie(
-                    logic_rev_df[logic_rev_df["revenue_type"] != "Total"],
-                    names="revenue_type",
-                    values="revenue",
-                    title="Logic-Based Revenue Split"
-                )
-                st.plotly_chart(fig, use_container_width=True)
-
-            st.markdown("---")
-                    # --- Detailed Rev Breakdown Based on Logic Image ---
-            st.subheader("🔍 Detailed Revenue Splits by Logic")
-
-            display_chart_table("Rev1 Breakdown by Description", "Rev1 Breakdown by Description", "description", "rev1_revenue")
-            display_chart_table("Rev2 Breakdown by Description", "Rev2 Breakdown by Description", "description", "rev2_revenue")
-            display_chart_table("Rev3 Breakdown by Type", "Rev3 Breakdown by Type", "rev3_type", "rev3_revenue")
-            st.markdown("---")
-            # Detailed and Other Tables
-            display_chart_table("Revenue by Partner Identifier", "Revenue by Partner Identifier", "partner_identifier", "total_revenue")
-            display_chart_table("Revenue by Partner Identifier and Type","Revenue by Partner Identifier and Type",x_col="partner_identifier",y_col="total_revenue",chart_type="bar")
-            display_chart_table("Revenue by Registration Cohort", "Revenue by Registration Cohort", "registration_month", "total_revenue", "line")
-            display_chart_table("Top Spenders", "Top Spenders", "student_id", "total_revenue")
-            display_chart_table("Revenue from First-Time Buyers", "Revenue from First-Time Buyers")
-            display_chart_table("Revenue from Returning Buyers", "Revenue from Returning Buyers")
-            display_chart_table("Partner Revenue", "Partner Revenue")
-            display_chart_table("Reactivation Revenue", "Reactivation Revenue")
-            display_chart_table("Post Reactivation Revenue", "Post Reactivation Revenue")
-            display_chart_table("Monthly Revenue Trend", "Monthly Revenue Trend", "month", "total_revenue", "line")
-            display_chart_table("Revenue by Country", "Revenue by Country", "country", "total_revenue")
-            display_chart_table("Revenue by Gender", "Revenue by Gender", "gender", "total_revenue")
-            display_chart_table("Revenue by Gateway", "Revenue by Gateway", "gateway", "total_revenue")
-            display_chart_table("Revenue by Brand", "Revenue by Brand", "brand", "total_revenue")
-            display_chart_table("Revenue by Currency", "Revenue by Currency", "currency", "total_revenue")
-
-            st.success("✅ Revenue analysis complete!")
-
     with tab1:
             st.subheader("📊 Breakdown of Total Leads")
             st.metric("📥 Total Leads (All Sources)", f"{total:,}")
@@ -1634,6 +1567,23 @@ if run_button:
             if not cancelled_by_age.empty:
                 st.markdown(f"🤝 **Top Age**: `{cancelled_by_age.iloc[0]['age_bucket']}` with `{cancelled_by_age.iloc[0]['cancelled_leads']:,}` cancellations")
         
+            st.markdown("### 🧾 Cancellation Reasons Summary")
+            reason_df = run_query(cancelled_leads_queries["cancellation_reason_summary"], start_date, end_date)
+            if not reason_df.empty:
+                st.dataframe(reason_df)
+                fig_reason = px.bar(reason_df, x="cancellation_reason", y="cancellations", title="Cancellation Reason Distribution", text="cancellations")
+                st.plotly_chart(fig_reason, use_container_width=True)
+
+            st.markdown("### 🌍 Cancellation Reasons by Country")
+            reason_country_df = run_query(cancelled_leads_queries["cancellation_reason_by_country"], start_date, end_date)
+            if not reason_country_df.empty:
+                st.dataframe(reason_country_df)
+
+            st.markdown("### 📘 Cancellation Reasons by Course")
+            reason_course_df = run_query(cancelled_leads_queries["cancellation_reason_by_course"], start_date, end_date)
+            if not reason_course_df.empty:
+                st.dataframe(reason_course_df)
+            
 
             # Reusable function for chart + table
             def chart_table(title, df, xcol, ycol):
@@ -1976,6 +1926,112 @@ if run_button:
                     mime='text/csv',
                 )
 
+
+    with tab9:
+        st.header("📊 Revenue Tab Insights --Under Maintainence , use the revenue link")
+
+        # -- Top Summary Metrics --
+        with st.spinner("Loading summary metrics..."):    
+            total_revenue = run_query(revenue_queries["Total Revenue"], start_date, end_date).iloc[0, 0]
+            unique_buyers = run_query(revenue_queries["Unique Buyers"], start_date, end_date).iloc[0, 0]
+            aov = run_query(revenue_queries["Average Order Value (AOV)"], start_date, end_date).iloc[0, 0]
+            refunds = run_query(revenue_queries["Refund Revenue"], start_date, end_date).iloc[0, 0]
+            refunds = refunds if refunds is not None else 0.0  # handle nulls
+            net_revenue = total_revenue - refunds  # safe subtraction
+
+            col1, col2, col3,col4,col5 = st.columns(5)
+            col1.metric("💰 Total Revenue", f"€{total_revenue:,.2f}")
+            col2.metric("🔁 Refunds", f"€{refunds:,.2f}")
+            col3.metric("🧮 Net Revenue", f"€{net_revenue:,.2f}")
+            col4.metric("🧑‍🏫 Unique Buyers", f"{unique_buyers:,}")
+            col5.metric("💳 AOV", f"{aov:,.2f}")
+
+            def display_chart_table(title, query_key, x_col=None, y_col=None, chart_type="bar"):
+                with st.spinner(f"Loading {title}..."):
+                    df = run_query(revenue_queries[query_key], start_date, end_date)
+                        # 🔢 Round all numeric columns to 2 decimal places
+                    df = df.round(2)
+                    
+                    if not df.empty:
+                        st.subheader(title)
+                        col1, col2 = st.columns([1, 2])
+
+                        with col1:
+                            st.dataframe(df)
+                            st.download_button(
+                                label=f"Download {title} CSV",
+                                data=df.to_csv(index=False).encode('utf-8'),
+                                file_name=f"{title.lower().replace(' ', '_')}.csv",
+                                mime="text/csv"
+                            )
+
+                        if x_col and y_col:
+                            with col2:
+                                if chart_type == "bar":
+                                    fig = px.bar(df, x=x_col, y=y_col, text=y_col, title=title)
+                                    fig.update_traces(textposition="outside")
+                                else:
+                                    fig = px.line(df, x=x_col, y=y_col, markers=True, title=title)
+                                st.plotly_chart(fig, use_container_width=True)
+
+                        st.markdown("---")
+
+
+                    # 🔍 Display Logic-Based Rev1/2/3 Split
+            logic_rev_df = run_query(revenue_queries["Revenue Logic Breakdown"], start_date, end_date).round(2)
+
+            # Add total row
+            total_row = pd.DataFrame([{
+                "revenue_type": "Total",
+                "revenue": logic_rev_df["revenue"].sum()
+            }])
+            logic_rev_df = pd.concat([logic_rev_df, total_row], ignore_index=True)
+
+            st.subheader("📊 Revenue Breakdown: Rev1 / Rev2 / Rev3 (Logic-Based)")
+            col1, col2 = st.columns([1, 2])
+            with col1:
+                st.dataframe(logic_rev_df)
+                st.download_button(
+                    label="Download Rev1/2/3 Logic Breakdown",
+                    data=logic_rev_df.to_csv(index=False).encode('utf-8'),
+                    file_name="revenue_logic_breakdown.csv",
+                    mime="text/csv"
+                )
+            with col2:
+                fig = px.pie(
+                    logic_rev_df[logic_rev_df["revenue_type"] != "Total"],
+                    names="revenue_type",
+                    values="revenue",
+                    title="Logic-Based Revenue Split"
+                )
+                st.plotly_chart(fig, use_container_width=True)
+
+            st.markdown("---")
+                    # --- Detailed Rev Breakdown Based on Logic Image ---
+            st.subheader("🔍 Detailed Revenue Splits by Logic")
+
+            display_chart_table("Rev1 Breakdown by Description", "Rev1 Breakdown by Description", "description", "rev1_revenue")
+            display_chart_table("Rev2 Breakdown by Description", "Rev2 Breakdown by Description", "description", "rev2_revenue")
+            display_chart_table("Rev3 Breakdown by Type", "Rev3 Breakdown by Type", "rev3_type", "rev3_revenue")
+            st.markdown("---")
+            # Detailed and Other Tables
+            display_chart_table("Revenue by Partner Identifier", "Revenue by Partner Identifier", "partner_identifier", "total_revenue")
+            display_chart_table("Revenue by Partner Identifier and Type","Revenue by Partner Identifier and Type",x_col="partner_identifier",y_col="total_revenue",chart_type="bar")
+            display_chart_table("Revenue by Registration Cohort", "Revenue by Registration Cohort", "registration_month", "total_revenue", "line")
+            display_chart_table("Top Spenders", "Top Spenders", "student_id", "total_revenue")
+            display_chart_table("Revenue from First-Time Buyers", "Revenue from First-Time Buyers")
+            display_chart_table("Revenue from Returning Buyers", "Revenue from Returning Buyers")
+            display_chart_table("Partner Revenue", "Partner Revenue")
+            display_chart_table("Reactivation Revenue", "Reactivation Revenue")
+            display_chart_table("Post Reactivation Revenue", "Post Reactivation Revenue")
+            display_chart_table("Monthly Revenue Trend", "Monthly Revenue Trend", "month", "total_revenue", "line")
+            display_chart_table("Revenue by Country", "Revenue by Country", "country", "total_revenue")
+            display_chart_table("Revenue by Gender", "Revenue by Gender", "gender", "total_revenue")
+            display_chart_table("Revenue by Gateway", "Revenue by Gateway", "gateway", "total_revenue")
+            display_chart_table("Revenue by Brand", "Revenue by Brand", "brand", "total_revenue")
+            display_chart_table("Revenue by Currency", "Revenue by Currency", "currency", "total_revenue")
+
+            st.success("✅ Revenue analysis complete!")
 
    
 else:
