@@ -318,8 +318,12 @@ if run_button:
             unique_buyers = run_query(revenue_queries["Unique Buyers"], start_date, end_date).iloc[0, 0]
             aov = run_query(revenue_queries["Average Order Value (AOV)"], start_date, end_date).iloc[0, 0]
             refunds = run_query(revenue_queries["Refund Revenue"], start_date, end_date).iloc[0, 0] or 0.0
-            net_revenue = total_revenue - refunds
+            # Ensure defaults for None values
+            total_revenue = total_revenue if total_revenue is not None else 0.0
+            refunds = refunds if refunds is not None else 0.0
 
+            #Now safe to compute
+            net_revenue = total_revenue - refunds
             reactivation_revenue = run_query(revenue_queries["Reactivation Revenue"], start_date, end_date).iloc[0, 0] or 0.0
             post_reactivation_revenue = run_query(revenue_queries["Post Reactivation Revenue"], start_date, end_date).iloc[0, 0] or 0.0
             first_time_revenue = run_query(revenue_queries["Revenue from First-Time Buyers"], start_date, end_date).iloc[0, 0] or 0.0
