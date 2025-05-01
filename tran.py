@@ -73,7 +73,7 @@ WHERE payment_date BETWEEN '{start_date}' AND '{end_date}'
   AND converted_amount > 0
   AND (
     description ILIKE '%course%' OR
-    description ILIKE '%toolkit%' OR
+    description ILIKE '%material%' OR
     description ILIKE '%hard%'
   );
 """,
@@ -110,7 +110,7 @@ WHERE payment_date BETWEEN '{start_date}' AND '{end_date}'
     SELECT 
       CASE
         WHEN description ILIKE '%course%' THEN 'Course'
-        WHEN description ILIKE '%toolkit%' THEN 'Toolkit'
+        WHEN description ILIKE '%material%' THEN 'Toolkit'
         WHEN description ILIKE '%hard%' THEN 'Hardcopy'
         ELSE 'Other'
       END AS rev3_type,
@@ -121,7 +121,7 @@ WHERE payment_date BETWEEN '{start_date}' AND '{end_date}'
       AND plan_id IS NULL
       AND (
         description ILIKE '%course%' OR
-        description ILIKE '%toolkit%' OR
+        description ILIKE '%material%' OR
         description ILIKE '%hard%'
       )
     GROUP BY rev3_type
@@ -189,8 +189,14 @@ WHERE payment_date BETWEEN '{start_date}' AND '{end_date}'
     data_marts.combined_transactions ct WHERE ct.payment_date BETWEEN '{start_date}' AND '{end_date}' 
     AND ct.converted_amount > 0  AND 
     ct.student_id NOT IN (SELECT DISTINCT student_id FROM data_marts.combined_transactions WHERE payment_date < '{start_date}' AND converted_amount > 0 AND student_id IS NOT NULL);""",
+   
+   
     "Revenue from Returning Buyers": """SELECT SUM(ct.converted_amount) AS returning_buyer_revenue FROM 
-    data_marts.combined_transactions ct WHERE ct.payment_date BETWEEN '{start_date}' AND '{end_date}' AND ct.converted_amount > 0  AND ct.student_id IN (SELECT DISTINCT student_id FROM data_marts.combined_transactions WHERE payment_date < '{start_date}' AND converted_amount > 0 AND student_id IS NOT NULL);""",
+    data_marts.combined_transactions ct WHERE ct.payment_date BETWEEN '{start_date}' AND '{end_date}' AND ct.converted_amount > 0  
+    AND ct.student_id IN (SELECT DISTINCT student_id FROM data_marts.combined_transactions WHERE payment_date < '{start_date}' 
+    AND converted_amount > 0 AND student_id IS NOT NULL);""",
+   
+   
     "Revenue by Registration Cohort": """SELECT DATE_TRUNC('month', ds.created_date) AS registration_month,
       SUM(ct.converted_amount) AS total_revenue FROM data_marts.combined_transactions ct JOIN data_warehouse.dim_students ds ON ct.student_id = ds.student_id WHERE ct.payment_date BETWEEN '{start_date}' AND '{end_date}' AND ct.converted_amount > 0  GROUP BY registration_month ORDER BY registration_month;""",
     "Top Spenders": """SELECT student_id, SUM(converted_amount) AS total_revenue FROM data_marts.combined_transactions WHERE payment_date BETWEEN '{start_date}' AND '{end_date}' AND converted_amount > 0 AND student_id IS NOT NULL GROUP BY student_id ORDER BY total_revenue DESC LIMIT 10;"""
@@ -200,7 +206,7 @@ WHERE payment_date BETWEEN '{start_date}' AND '{end_date}'
 SELECT
   CASE
     WHEN description ILIKE '%lifetime%' THEN 'Rev2'
-    WHEN description ILIKE '%course%' OR description ILIKE '%toolkit%' OR description ILIKE '%hard%' THEN 'Rev3'
+    WHEN description ILIKE '%course%' OR description ILIKE '%material%' OR description ILIKE '%hard%' THEN 'Rev3'
     WHEN plan_id IS NOT NULL THEN 'Rev1'
     ELSE 'Other'
   END AS revenue_type,
@@ -217,7 +223,7 @@ SELECT
   ds.profile__partner_identifier AS partner_identifier,
   CASE
     WHEN ct.description ILIKE '%lifetime%' THEN 'Rev2'
-    WHEN ct.description ILIKE '%course%' OR ct.description ILIKE '%toolkit%' OR ct.description ILIKE '%hard%' THEN 'Rev3'
+    WHEN ct.description ILIKE '%course%' OR ct.description ILIKE '%material%' OR ct.description ILIKE '%hard%' THEN 'Rev3'
     WHEN ct.plan_id IS NOT NULL THEN 'Rev1'
     ELSE 'Other'
   END AS revenue_category,
@@ -232,16 +238,33 @@ ORDER BY ds.profile__partner_identifier, revenue_category;
 """
 ,
 "Rev1 Billing Frequency Breakdown": """
-SELECT 
-  billing_period_t AS billing_frequency,
-  COUNT(DISTINCT student_id) AS unique_buyers,
-  SUM(converted_amount) AS total_revenue
-FROM data_marts.combined_transactions
-WHERE payment_date BETWEEN '{start_date}' AND '{end_date}'
-  AND plan_id IS NOT NULL
-  AND converted_amount > 0
-GROUP BY billing_frequency
-ORDER BY total_revenue DESC;
+WITH classified_txns AS (
+  SELECT
+    *,
+    CASE
+      WHEN description ILIKE '%lifetime%' THEN 'Rev2'
+      WHEN description ILIKE '%course%' OR description ILIKE '%toolkit%' OR description ILIKE '%hard%' THEN 'Rev3'
+      WHEN plan_id IS NOT NULL THEN 'Rev1'
+      ELSE 'Other'
+    END AS revenue_type
+  FROM data_marts.combined_transactions
+  WHERE payment_date BETWEEN '{start_date}' AND '{end_date}'
+    AND converted_amount > 0
+)
+
+SELECT
+  revenue_type,
+  CASE 
+    WHEN revenue_type = 'Rev1' AND billing_period_t IN (1, 28) THEN '1'
+    WHEN revenue_type = 'Rev1' THEN billing_period_t
+    ELSE NULL
+  END AS billing_frequency,
+  SUM(converted_amount) AS revenue,
+  COUNT(*) AS transaction_count
+FROM classified_txns
+WHERE revenue_type = 'Rev1'
+GROUP BY revenue_type, billing_frequency
+ORDER BY revenue_type, billing_frequency;
 """
 
 }
@@ -265,37 +288,66 @@ ORDER BY rev1_revenue DESC;
 """
 
 revenue_queries["Rev2 Breakdown by Description"] = """
+WITH classified_txns AS (
+  SELECT
+    *,
+    CASE
+      WHEN LOWER(description) ILIKE '%lifetime%' THEN 'Rev2'
+      WHEN LOWER(description) LIKE '%certificate%' OR LOWER(description) LIKE '%material%' OR LOWER(description) LIKE '%diploma%' THEN 'Rev3'
+      WHEN plan_id IS NOT NULL THEN 'Rev1'
+      ELSE 'Other'
+    END AS revenue_type
+  FROM data_marts.combined_transactions
+  WHERE payment_date BETWEEN '{start_date}' AND '{end_date}'
+    AND converted_amount > 0
+)
 SELECT
-  description,
-  SUM(converted_amount) AS rev2_revenue
-FROM data_marts.combined_transactions
-WHERE payment_date BETWEEN '{start_date}' AND '{end_date}'
-  AND converted_amount > 0
-  AND description ILIKE '%lifetime%'
-GROUP BY description
-ORDER BY rev2_revenue DESC;
+  CASE
+    WHEN LOWER(description) LIKE '%basic%' THEN 'Lifetime - Basic'
+    WHEN LOWER(description) LIKE '%standard%' THEN 'Lifetime - Standard'
+    WHEN LOWER(description) LIKE '%unlimited%' THEN 'Lifetime - Unlimited'
+    ELSE 'Lifetime - Other'
+  END AS rev2_type,
+  SUM(converted_amount) AS revenue,
+  COUNT(*) AS transaction_count
+FROM classified_txns
+WHERE revenue_type = 'Rev2'
+GROUP BY rev2_type
+ORDER BY revenue DESC;
 """
 
 revenue_queries["Rev3 Breakdown by Type"] = """
+WITH classified_txns AS (
+  SELECT
+    *,
+    CASE
+      WHEN LOWER(description) ILIKE '%lifetime%' THEN 'Rev2'
+      WHEN LOWER(description) LIKE '%certificate%' OR LOWER(description) LIKE '%material%' OR LOWER(description) LIKE '%diploma%' THEN 'Rev3'
+      WHEN plan_id IS NOT NULL THEN 'Rev1'
+      ELSE 'Other'
+    END AS revenue_type
+  FROM data_marts.combined_transactions
+  WHERE payment_date BETWEEN '{start_date}' AND '{end_date}'
+    AND converted_amount > 0
+)
 SELECT
   CASE
-    WHEN description ILIKE '%course%' THEN 'Course'
-    WHEN description ILIKE '%toolkit%' THEN 'Toolkit'
-    WHEN description ILIKE '%hard%' THEN 'Hardcopy'
-    ELSE 'Other'
+    WHEN LOWER(description) LIKE '%material%' THEN 'Rev3 - Toolkit'
+    WHEN LOWER(description) LIKE '%hard%copy%diploma%' THEN 'Rev3 - Diploma'
+    WHEN LOWER(description) LIKE '%certificate%' THEN 'Rev3 - Certificate'
+    ELSE 'Rev3 - Other'
   END AS rev3_type,
-  SUM(converted_amount) AS rev3_revenue
-FROM data_marts.combined_transactions
-WHERE payment_date BETWEEN '{start_date}' AND '{end_date}'
-  AND converted_amount > 0
-  AND plan_id IS NULL
+  SUM(converted_amount) AS revenue,
+  COUNT(*) AS transaction_count
+FROM classified_txns
+WHERE revenue_type = 'Rev3'
   AND (
-    description ILIKE '%course%' OR
-    description ILIKE '%toolkit%' OR
-    description ILIKE '%hard%'
+    LOWER(description) LIKE '%material%' OR
+    LOWER(description) LIKE '%diploma%' OR
+    LOWER(description) LIKE '%certificate%'
   )
 GROUP BY rev3_type
-ORDER BY rev3_revenue DESC;
+ORDER BY revenue DESC;
 """
 
 
@@ -318,16 +370,13 @@ if run_button:
             unique_buyers = run_query(revenue_queries["Unique Buyers"], start_date, end_date).iloc[0, 0]
             aov = run_query(revenue_queries["Average Order Value (AOV)"], start_date, end_date).iloc[0, 0]
             refunds = run_query(revenue_queries["Refund Revenue"], start_date, end_date).iloc[0, 0] or 0.0
-            # Ensure defaults for None values
-            total_revenue = total_revenue if total_revenue is not None else 0.0
-            refunds = refunds if refunds is not None else 0.0
-
-            #Now safe to compute
             net_revenue = total_revenue - refunds
+
             reactivation_revenue = run_query(revenue_queries["Reactivation Revenue"], start_date, end_date).iloc[0, 0] or 0.0
             post_reactivation_revenue = run_query(revenue_queries["Post Reactivation Revenue"], start_date, end_date).iloc[0, 0] or 0.0
             first_time_revenue = run_query(revenue_queries["Revenue from First-Time Buyers"], start_date, end_date).iloc[0, 0] or 0.0
             returning_revenue = run_query(revenue_queries["Revenue from Returning Buyers"], start_date, end_date).iloc[0, 0] or 0.0
+      
 
           # Row 1: 2 columns
             col1, col2 = st.columns(2)
@@ -379,6 +428,22 @@ if run_button:
 
 
                     # 🔍 Display Logic-Based Rev1/2/3 Split
+            def display_chart_table_dual(title, df, x_col, y_cols):
+              """
+              Displays two bar charts (for each y_col) and a combined data table.
+              """
+              col1, col2 = st.columns(2)
+
+              with col1:
+                  fig1 = px.bar(df, x=x_col, y=y_cols[0], text=y_cols[0], title=f"{title} - {y_cols[0].replace('_', ' ').title()}")
+                  st.plotly_chart(fig1)
+
+              with col2:
+                  fig2 = px.bar(df, x=x_col, y=y_cols[1], text=y_cols[1], title=f"{title} - {y_cols[1].replace('_', ' ').title()}")
+                  st.plotly_chart(fig2)
+
+              st.markdown("### 📋 Full Data Table")
+              st.dataframe(df)
             logic_rev_df = run_query(revenue_queries["Revenue Logic Breakdown"], start_date, end_date).round(2)
             
             # Add total row
@@ -410,16 +475,27 @@ if run_button:
             st.markdown("---")
             st.subheader("🧩 Deep Dive: Rev1 / Rev2 / Rev3 Logic")
 
+#            with st.expander("📘 Rev1 Breakdown"):
+#                display_chart_table("Rev1 Breakdown by Description", "Rev1 Breakdown by Description", "description", "rev1_revenue")
+#                st.markdown("### 📆 Rev1 Breakdown by Billing Frequency")
+#                display_chart_table("Rev1 Billing Frequency Breakdown", "Rev1 Billing Frequency Breakdown", "billing_frequency", "revenue")
+
+#            with st.expander("📙 Rev2 Breakdown"):
+#                display_chart_table("Rev2 Breakdown by Description", "Rev2 Breakdown by Description", "rev2_type", "revenue")
+#             with st.expander("📗 Rev3 Breakdown"):
+#                display_chart_table("Rev3 Breakdown by Type", "Rev3 Breakdown by Type", "rev3_type", "revenue")
+                
             with st.expander("📘 Rev1 Breakdown"):
-                display_chart_table("Rev1 Breakdown by Description", "Rev1 Breakdown by Description", "description", "rev1_revenue")
-                st.markdown("### 📆 Rev1 Breakdown by Billing Frequency")
-                display_chart_table("Rev1 Billing Frequency Breakdown", "Rev1 Billing Frequency Breakdown", "billing_frequency", "total_revenue")
+                rev1_df = run_query(revenue_queries["Rev1 Billing Frequency Breakdown"], start_date, end_date)
+                display_chart_table_dual("Rev1 Billing Frequency Breakdown", rev1_df, "billing_frequency", ["revenue", "transaction_count"])
 
             with st.expander("📙 Rev2 Breakdown"):
-                display_chart_table("Rev2 Breakdown by Description", "Rev2 Breakdown by Description", "description", "rev2_revenue")
+                rev2_df = run_query(revenue_queries["Rev2 Breakdown by Description"], start_date, end_date)
+                display_chart_table_dual("Rev2 Breakdown by Description", rev2_df, "rev2_type", ["revenue", "transaction_count"])
 
             with st.expander("📗 Rev3 Breakdown"):
-                display_chart_table("Rev3 Breakdown by Type", "Rev3 Breakdown by Type", "rev3_type", "rev3_revenue")
+                rev3_df = run_query(revenue_queries["Rev3 Breakdown by Type"], start_date, end_date)
+                display_chart_table_dual("Rev3 Breakdown by Type", rev3_df, "rev3_type", ["revenue", "transaction_count"])
 
             st.markdown("---")
             display_chart_table("Revenue by Partner Identifier", "Revenue by Partner Identifier", "partner_identifier", "total_revenue")
