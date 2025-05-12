@@ -180,7 +180,7 @@ def display_chart(df, x_col, y_col, title):
             st.markdown(f"**📋 Data: {title}**")
             st.dataframe(df)
         with col2:
-            fig = px.bar(df, x=x_col, y=y_col, title=title,
+            fig = px.bar(df, x=x_col, y=y_col, title=title,text_auto=True,  
                          labels={x_col: x_col.replace('_', ' ').title(),
                                  y_col: y_col.replace('_', ' ').title()})
             st.plotly_chart(fig, use_container_width=True)
@@ -195,7 +195,7 @@ def display_chart(df, x_col, y_col, title):
             st.markdown(f"**📋 Data: {title}**")
             st.dataframe(df)
         with col2:
-            fig = px.bar(df, x=x_col, y=y_col, title=title,
+            fig = px.bar(df, x=x_col, y=y_col, title=title,text_auto=True,  
                          labels={x_col: x_col.replace('_', ' ').title(),
                                  y_col: y_col.replace('_', ' ').title()})
             st.plotly_chart(fig, use_container_width=True, key=title)  # ✅ Unique key added here
@@ -210,11 +210,11 @@ def display_chart_table_dual(title, df, x_col, y_cols):
     col1, col2 = st.columns(2)
 
     with col1:
-        fig1 = px.bar(df, x=x_col, y=y_cols[0], text=y_cols[0], title=f"{title} - {y_cols[0].replace('_', ' ').title()}")
+        fig1 = px.bar(df, x=x_col, y=y_cols[0], text=y_cols[0], text_auto=True,  title=f"{title} - {y_cols[0].replace('_', ' ').title()}")
         st.plotly_chart(fig1)
 
     with col2:
-         fig2 = px.bar(df, x=x_col, y=y_cols[1], text=y_cols[1], title=f"{title} - {y_cols[1].replace('_', ' ').title()}")
+         fig2 = px.bar(df, x=x_col, y=y_cols[1], text=y_cols[1],text_auto=True,   title=f"{title} - {y_cols[1].replace('_', ' ').title()}")
          st.plotly_chart(fig2)
 
     st.markdown("### 📋 Full Data Table")
@@ -304,19 +304,25 @@ if st.button("🚀 Run Analysis - All numbers are for the CC cohort selected in 
             cancelled_count_df = run_query(query_cancelled_metric, start_date, end_date)
             total_cancelled = cancelled_count_df.iloc[0]['cancelled_leads']
             st.metric("❌ Cancelled Qualified Leads", f"{total_cancelled:,}")
+            # % of Cancelled Qualified Leads
+            cancel_rate = (total_cancelled / qualified) * 100 if qualified else 0
+            st.metric("📉 % Cancelled from Qualified CC Leads", f"{cancel_rate:.2f}%")
+            avg_days_to_cancel = cancellation_details["days_to_cancel"].mean()
+            st.metric("📆 Average Days to Cancel", f"{avg_days_to_cancel:.1f} days")
 
 
-            st.subheader("📋 Cancellation Details by Student")
-            st.dataframe(cancellation_details)
+
+            with st.expander("📋 View Cancellation Details by Student ID", expanded=False):
+                st.dataframe(cancellation_details)
 
             st.subheader("📊 Days to Cancel Distribution")
-            fig_cancel_days = px.histogram(cancellation_details, x="days_to_cancel", nbins=10, title="Distribution of Days to Cancel")
+            fig_cancel_days = px.histogram(cancellation_details, x="days_to_cancel", nbins=10, title="Distribution of Days to Cancel", text_auto=True)
             st.plotly_chart(fig_cancel_days, use_container_width=True, key="cancel_days_histogram")
 
             st.subheader("📊 Top Cancellation Reasons")
             reason_counts = cancellation_details['cancellation_reason'].value_counts().reset_index()
             reason_counts.columns = ["Reason", "Count"]
-            fig_cancel_reasons = px.bar(reason_counts, x="Reason", y="Count", title="Top Cancellation Reasons")
+            fig_cancel_reasons = px.bar(reason_counts, x="Reason", y="Count", title="Top Cancellation Reasons",text_auto=True)
             st.plotly_chart(fig_cancel_reasons, use_container_width=True, key="cancel_reasons_bar")
 
             # Days to Cancel by Course
@@ -433,7 +439,10 @@ if st.button("🚀 Run Analysis - All numbers are for the CC cohort selected in 
             """
             df_aov = run_query(query_aov, start_date, end_date)
             aov = df_aov.iloc[0]['average_order_value'] or 0
-            st.metric("🧾 Average Order Value", f"€{aov:,.2f}")
+            st.metric("🧾 AOV per Transaction", f"€{aov:,.2f}")
+            aov_per_buyer = total_revenue / qualified if qualified else 0
+            st.metric("👤 AOV per CC Buyer", f"€{aov_per_buyer:,.2f}")
+
 
             # --- Revenue Breakdown by Type ---
             query_breakdown = f"""
@@ -457,6 +466,99 @@ if st.button("🚀 Run Analysis - All numbers are for the CC cohort selected in 
             df_revenue_breakdown = run_query(query_breakdown, start_date, end_date)
             display_chart(df_revenue_breakdown, "revenue_type", "revenue", "Revenue by Type (Rev1/Rev2/Rev3)")
     
+ 
+            query_first_time_buyers_detail = f"""
+                SELECT
+                    ct.student_id,
+                    ct.transaction_id,
+                    ct.converted_amount,
+                    ct.payment_date
+                FROM data_marts.combined_transactions ct
+                JOIN data_marts.combined_subscriptions cs 
+                    ON ct.student_id = cs.value__meta_data_lead_id
+                JOIN data_warehouse.dim_students ds 
+                    ON ds.student_id = cs.value__meta_data_lead_id
+                WHERE cs.created_at BETWEEN '{start_date}' AND '{end_date}'
+                AND ct.converted_amount > 0
+                {revenue_where_clause}
+                AND ct.student_id NOT IN (
+                    SELECT DISTINCT student_id 
+                    FROM data_marts.combined_transactions
+                    WHERE payment_date < '{start_date}'
+                        AND converted_amount > 0
+                        AND student_id IS NOT NULL
+                )
+            """
+
+            df_first_time_buyers = run_query(query_first_time_buyers_detail, start_date, end_date)
+            first_time_revenue = df_first_time_buyers["converted_amount"].sum()
+
+
+            st.metric("🧑‍🎓 Revenue from First-Time Buyers", f"€{first_time_revenue:,.2f}")
+
+            with st.expander("📋 First-Time Buyer Transactions"):
+                st.dataframe(df_first_time_buyers)
+
+
+            query_returning_buyers_detail = f"""
+                SELECT
+                    ct.student_id,
+                    ct.transaction_id,
+                    ct.converted_amount,
+                    ct.payment_date
+                FROM data_marts.combined_transactions ct
+                JOIN data_marts.combined_subscriptions cs 
+                    ON ct.student_id = cs.value__meta_data_lead_id
+                JOIN data_warehouse.dim_students ds 
+                    ON ds.student_id = cs.value__meta_data_lead_id
+                WHERE cs.created_at BETWEEN '{start_date}' AND '{end_date}'
+                AND ct.converted_amount > 0
+                {revenue_where_clause}
+                AND ct.student_id IN (
+                    SELECT DISTINCT student_id 
+                    FROM data_marts.combined_transactions
+                    WHERE payment_date < '{start_date}'
+                        AND converted_amount > 0
+                        AND student_id IS NOT NULL
+                )
+            """
+
+
+            df_returning_buyers = run_query(query_returning_buyers_detail, start_date, end_date)
+            returning_buyer_revenue = df_returning_buyers["converted_amount"].sum()
+
+            st.metric("🔁 Revenue from Returning Buyers", f"€{returning_buyer_revenue:,.2f}")
+
+            with st.expander("📋 Returning Buyer Transactions"):
+                st.dataframe(df_returning_buyers)
+
+
+
+            if total_revenue > 0:
+                first_time_share = (first_time_revenue / total_revenue) * 100
+                returning_share = (returning_buyer_revenue / total_revenue) * 100
+                st.write(f"🧾 Revenue Share — First-Time Buyers: **{first_time_share:.2f}%**, Returning Buyers: **{returning_share:.2f}%**")
+
+
+            first_time_revenue = df_first_time_buyers["converted_amount"].sum()
+            returning_buyer_revenue = df_returning_buyers["converted_amount"].sum()
+
+            # 📊 Pie Chart: Revenue Split by Buyer Type
+            revenue_share_df = pd.DataFrame({
+                "Buyer Type": ["First-Time Buyers", "Returning Buyers"],
+                "Revenue": [first_time_revenue, returning_buyer_revenue]
+            })
+
+            fig_share = px.pie(
+                revenue_share_df,
+                names="Buyer Type",
+                values="Revenue",
+                title="💹 Revenue Share by Buyer Type",
+                hole=0.4
+            )
+
+            st.plotly_chart(fig_share, use_container_width=True)
+
 
             query_rev1_billing_frequency = f"""
                 WITH classified_txns AS (
@@ -791,3 +893,42 @@ if st.button("🚀 Run Analysis - All numbers are for the CC cohort selected in 
             df = run_query(query, start_date, end_date)
             display_chart(df, "reactivation_month", "total_reactivated_users", "📆 Reactivated Users by Month")
 
+
+
+            st.subheader("🗓️ Monthly Registrations (After CC Date)")
+
+            query_monthly_regs_after_cc = f"""
+                SELECT DATE_TRUNC('month', dsc.registered_on) AS registration_month,
+                    COUNT(DISTINCT dsc.registration_id) AS total_registrations,
+                    COUNT(DISTINCT dsc.student_id) AS total_unique_students
+                FROM data_warehouse.dim_schedules dsc
+                JOIN data_marts.combined_subscriptions cs 
+                    ON dsc.student_id = cs.value__meta_data_lead_id
+                {course_details_where_clause}
+                AND cs.created_at BETWEEN '{start_date}' AND '{end_date}'
+                AND dsc.registered_on > cs.created_at
+                GROUP BY 1
+                ORDER BY 1;
+            """
+            df_monthly_regs_after_cc = run_query(query_monthly_regs_after_cc, start_date, end_date)
+            display_chart(df_monthly_regs_after_cc, "registration_month", "total_registrations", "🗓️ Monthly Registrations (Post-CC)")
+
+
+            st.subheader("👨‍🏫 Attendance by Course (Watched > 0 sec)")
+
+            query_attendance_by_course = f"""
+                SELECT COALESCE(dsc.course_slug, 'Unknown') AS course_slug,
+                    COUNT(DISTINCT fa.value__student_id) AS total_students_attended
+                FROM firestore_api.firestore_attendance fa
+                JOIN data_warehouse.dim_schedules dsc 
+                    ON fa.value__registrations_id = dsc.registration_id
+                JOIN data_marts.combined_subscriptions cs 
+                    ON dsc.student_id = cs.value__meta_data_lead_id
+                {course_details_where_clause}
+                AND cs.created_at BETWEEN '{start_date}' AND '{end_date}'
+                AND fa.value__watched__bigint > 0
+                GROUP BY 1
+                ORDER BY total_students_attended DESC;
+            """
+            df_attendance_by_course = run_query(query_attendance_by_course, start_date, end_date)
+            display_chart(df_attendance_by_course, "course_slug", "total_students_attended", "👨‍🏫 Attendance by Course (Watched > 0 sec)")
