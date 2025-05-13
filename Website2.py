@@ -64,6 +64,16 @@ def build_course_details_where_clause(countries, partners, offers):
     if offers:
         clause += f" AND ds.offer_type IN ({', '.join([repr(o) for o in offers])})"
     return clause
+
+def build_course_details_where_clause(countries, partners, offers):
+    clause = "WHERE cs.created_at BETWEEN '{start_date}' AND '{end_date}'"
+    if countries:
+        clause += f" AND ds.country IN ({', '.join([repr(c) for c in countries])})"
+    if partners:
+        clause += f" AND ds.profile__partner_identifier IN ({', '.join([repr(p) for p in partners])})"
+    if offers:
+        clause += f" AND ds.offer_type IN ({', '.join([repr(o) for o in offers])})"
+    return clause
 # SQL Queries 
 def get_qualified_leads(start, end, countries, partners, offers):
     where_clause = build_where_clause(countries, partners, offers)
@@ -792,6 +802,8 @@ if st.button("🚀 Run Analysis - All numbers are for the CC cohort selected in 
                     COUNT(DISTINCT dsc.student_id) AS total_unique_students
                 FROM data_warehouse.dim_schedules dsc
                 JOIN data_marts.combined_subscriptions cs ON dsc.student_id = cs.value__meta_data_lead_id
+                left JOIN data_warehouse.dim_students ds ON ds.student_id = dsc.student_id
+
                 {course_details_where_clause}
                 and cs.created_at BETWEEN '{start_date}' AND '{end_date}'
                 GROUP BY 1 ORDER BY 1;
@@ -805,6 +817,7 @@ if st.button("🚀 Run Analysis - All numbers are for the CC cohort selected in 
                 FROM data_warehouse.dim_students ds
                 JOIN data_marts.combined_subscriptions cs ON ds.student_id = cs.value__meta_data_lead_id
                 JOIN data_warehouse.dim_schedules dsc ON ds.student_id = dsc.student_id
+                
                 {course_details_where_clause}
                 and cs.created_at BETWEEN '{start_date}' AND '{end_date}'
                 GROUP BY ds.country ORDER BY total_registrations DESC;
@@ -817,6 +830,8 @@ if st.button("🚀 Run Analysis - All numbers are for the CC cohort selected in 
                 SELECT dsc.course_slug, COUNT(DISTINCT dsc.registration_id) AS total_registrations
                 FROM data_warehouse.dim_schedules dsc
                 JOIN data_marts.combined_subscriptions cs ON dsc.student_id = cs.value__meta_data_lead_id
+                left JOIN data_warehouse.dim_students ds ON ds.student_id = dsc.student_id
+
                 {course_details_where_clause}
                 and cs.created_at BETWEEN '{start_date}' AND '{end_date}'
                 
@@ -832,6 +847,8 @@ if st.button("🚀 Run Analysis - All numbers are for the CC cohort selected in 
                 FROM firestore_api.firestore_attendance fa
                 JOIN data_warehouse.dim_schedules dsc ON fa.value__registrations_id = dsc.registration_id
                 JOIN data_marts.combined_subscriptions cs ON dsc.student_id = cs.value__meta_data_lead_id
+                left JOIN data_warehouse.dim_students ds ON ds.student_id = dsc.student_id
+
                 
                 {course_details_where_clause}
                 and cs.created_at BETWEEN '{start_date}' AND '{end_date}'
@@ -845,6 +862,8 @@ if st.button("🚀 Run Analysis - All numbers are for the CC cohort selected in 
             query = f"""
                 SELECT COUNT(DISTINCT cs.value__meta_data_lead_id) AS total_reactivated_users
                 FROM data_marts.combined_subscriptions cs
+                left JOIN data_warehouse.dim_students ds ON ds.student_id = cs.value__meta_data_lead_id
+
                 {course_details_where_clause}
                 and cs.created_at BETWEEN '{start_date}' AND '{end_date}'
                 AND cs.reactivated_on IS NOT NULL;
@@ -885,6 +904,7 @@ if st.button("🚀 Run Analysis - All numbers are for the CC cohort selected in 
                 SELECT DATE_TRUNC('month', cs.reactivated_on) AS reactivation_month,
                     COUNT(DISTINCT cs.value__meta_data_lead_id) AS total_reactivated_users
                 FROM data_marts.combined_subscriptions cs
+                JOIN data_warehouse.dim_students ds ON cs.value__meta_data_lead_id = ds.student_id
                 {course_details_where_clause}
                 and cs.created_at BETWEEN '{start_date}' AND '{end_date}'
                 AND cs.reactivated_on IS NOT NULL
@@ -904,6 +924,8 @@ if st.button("🚀 Run Analysis - All numbers are for the CC cohort selected in 
                 FROM data_warehouse.dim_schedules dsc
                 JOIN data_marts.combined_subscriptions cs 
                     ON dsc.student_id = cs.value__meta_data_lead_id
+                        JOIN data_warehouse.dim_students ds 
+                     ON ds.student_id = dsc.student_id
                 {course_details_where_clause}
                 AND cs.created_at BETWEEN '{start_date}' AND '{end_date}'
                 AND dsc.registered_on > cs.created_at
@@ -924,6 +946,8 @@ if st.button("🚀 Run Analysis - All numbers are for the CC cohort selected in 
                     ON fa.value__registrations_id = dsc.registration_id
                 JOIN data_marts.combined_subscriptions cs 
                     ON dsc.student_id = cs.value__meta_data_lead_id
+                        JOIN data_warehouse.dim_students ds 
+                      ON ds.student_id = dsc.student_id
                 {course_details_where_clause}
                 AND cs.created_at BETWEEN '{start_date}' AND '{end_date}'
                 AND fa.value__watched__bigint > 0
