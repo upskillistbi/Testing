@@ -1341,7 +1341,11 @@ if run_button:
     # Update sidebar
     st.sidebar.metric("📥 Total Leads", f"{total:,}")
     st.sidebar.metric("🎯 Qualified Leads", f"{qualified:,}")
-    st.sidebar.metric("🔁 Conversion Rate", f"{conversion_pct:.2f}%")
+    if conversion_pct is not None:
+        st.sidebar.metric("🔁 Conversion Rate", f"{conversion_pct:.2f}%")
+    else:
+        st.sidebar.metric("🔁 Conversion Rate", "N/A")
+
     st.sidebar.metric("❌ Cancelled Leads", f"{cancelled:,}")
 
     # Tabs for breakdowns
