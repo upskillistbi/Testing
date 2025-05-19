@@ -1,8 +1,9 @@
 import streamlit as st
 import pandas as pd
 import psycopg2
-
-# --- Redshift Connection ---
+import re
+import plotly.express as px
+# --- DB Connection ---
 def run_query(query):
     conn = psycopg2.connect(
         host="misreporting.cxgsxkol4p2y.eu-west-1.redshift.amazonaws.com",
@@ -15,109 +16,265 @@ def run_query(query):
     conn.close()
     return df
 
-# --- Streamlit Page Setup ---
-st.set_page_config(page_title="🎯 Multi Student Lookup", layout="wide")
-st.title("📘 Multi Student Deep Dive Dashboard")
-st.markdown("Paste multiple `student_id`s (one per line) below:")
+# --- Page Setup ---
+st.set_page_config(page_title="📘 Student Lookup (ID + Email)", layout="wide")
+st.title("🎯 Multi-Student Deep Dive Dashboard")
+st.markdown("Paste a mix of **student IDs** and/or **emails** (one per line):")
 
-# --- Input Box ---
-input_ids = st.text_area("Paste student IDs here (one per line):")
+# --- Input Area ---
+user_input = st.text_area("Enter student IDs or Emails (one per line):")
 
-def format_ids(raw_text):
-    ids = [x.strip() for x in raw_text.strip().split('\n') if x.strip()]
-    return ids, ', '.join(f"'{x}'" for x in ids)
 
-# --- Run Lookup ---
-if st.button("🔍 Run Lookup") and input_ids:
-    id_list, formatted_ids = format_ids(input_ids)
 
-    if not id_list:
-        st.warning("⚠️ Please enter valid student IDs.")
+def normalize_email(email):
+    if '+' in email:
+        local, domain = email.split('@')
+        local = re.sub(r'\+.*', '', local)
+        return f"{local}@{domain}"
+    return email
+
+def separate_ids_emails(raw_input):
+    ids, emails = [], []
+    for line in raw_input.strip().split('\n'):
+        val = line.strip()
+        if not val:
+            continue
+        if "@" in val:
+            cleaned_email = normalize_email(val.lower())
+            emails.append(cleaned_email)
+        else:
+            ids.append(val)
+    return ids, emails, ', '.join(f"'{x}'" for x in ids), ', '.join(f"'{x}'" for x in emails)
+
+
+
+# --- Run ---
+if st.button("🔍 Run Lookup") and user_input:
+    ids, emails, formatted_ids, formatted_emails = separate_ids_emails(user_input)
+
+    if not ids and not emails:
+        st.warning("⚠️ Please enter valid student IDs or emails.")
     else:
-        st.success(f"🔎 Running for {len(id_list)} students...")
+        st.success(f"🔎 Running for {len(ids)} IDs and {len(emails)} emails...")
 
-        # --- Student Info ---
+        # --- Filter Clause ---
+        filters = []
+        if ids:
+            filters.append(f"student_id IN ({formatted_ids})")
+        if emails:
+            filters.append(f"REGEXP_REPLACE(LOWER(email_address), '\\\\+[^@]*', '') IN ({formatted_emails})")
+
+        where_clause = " OR ".join(filters)
+
+        # --- 1. Student Info ---
         st.subheader("🧑 Student Info")
-        student_info_query = f"""
-            SELECT student_id,
-                age_group,
-                offer_type,
-                country,
-                created_date,
-                profile__partner_identifier AS partner_identifier,
-                coursepicked
+        query_info = f"""
+            SELECT student_id, email_address AS email, age_group, offer_type, country,
+                   profile__partner_identifier AS partner_identifier, created_date, coursepicked
             FROM data_warehouse.dim_students
-            WHERE student_id IN ({formatted_ids});
+            WHERE {where_clause};
         """
-        df_info = run_query(student_info_query)
+        df_info = run_query(query_info)
+        # Replace formatted_resolved_ids if emails were given
+        resolved_ids = df_info["student_id"].dropna().unique().tolist()
+        formatted_resolved_ids = ', '.join(f"'{x}'" for x in resolved_ids)
+
         st.dataframe(df_info, use_container_width=True)
 
-        # --- Qualified CC Leads ---
+       
+        # --- 2. Qualified CC Leads ---
         st.subheader("💳 Qualified Leads Presence")
-        cc_check_query = f"""
-            SELECT DISTINCT value__meta_data_lead_id AS student_id
-            FROM data_marts.combined_subscriptions
-            WHERE value__meta_data_lead_id IN ({formatted_ids});
-        """
-        df_cc = run_query(cc_check_query)
-        df_info["is_qualified_lead"] = df_info["student_id"].isin(df_cc["student_id"])
-        st.dataframe(df_info[["student_id", "is_qualified_lead"]], use_container_width=True)
 
-        # --- Courses Picked in dim_students ---
-        st.subheader("📚 Course Clicked Count")
+        if resolved_ids:
+            query_cc = f"""
+                SELECT DISTINCT value__meta_data_lead_id AS student_id
+                FROM data_marts.combined_subscriptions
+                WHERE value__meta_data_lead_id IN ({formatted_resolved_ids});
+            """
+            df_cc = run_query(query_cc)
+            df_info["is_qualified_lead"] = df_info["student_id"].isin(df_cc["student_id"])
+        else:
+            df_cc = pd.DataFrame(columns=["student_id"])
+            df_info["is_qualified_lead"] = False
+
+        st.dataframe(df_info[["student_id", "email", "is_qualified_lead"]], use_container_width=True)
+
+        # --- 3. Courses Picked Count ---
+        st.subheader("📚 Courses Picked Count")
         coursepicked_query = f"""
-            SELECT student_id, COUNT(DISTINCT coursepicked) AS courses_clicked
+            SELECT student_id, coursepicked AS courses_clicked_on_leads_table
             FROM data_warehouse.dim_students
-            WHERE student_id IN ({formatted_ids})
-            GROUP BY student_id;
+            WHERE {where_clause}
+            GROUP BY student_id,coursepicked;
         """
         df_coursepicked = run_query(coursepicked_query)
         st.dataframe(df_coursepicked, use_container_width=True)
 
-        # --- Registrations ---
+        
+        # --- 4. Registrations ---
         st.subheader("📝 Course Registrations")
-        reg_query = f"""
-            SELECT  student_id, registration_id, course_slug, registered_on
-            FROM data_warehouse.dim_schedules
-            WHERE student_id IN ({formatted_ids})
-            ORDER BY student_id, registered_on;
-        """
-        df_reg = run_query(reg_query)
-        df_reg = df_reg.drop_duplicates(subset=["student_id", "registration_id", "course_slug","registered_on"])
+
+        if resolved_ids:
+            reg_query = f"""
+                SELECT DISTINCT student_id, registration_id, course_slug, registered_on
+                FROM data_warehouse.dim_schedules
+                WHERE student_id IN ({formatted_resolved_ids})
+                ORDER BY student_id, registered_on;
+            """
+            df_reg = run_query(reg_query)
+        else:
+            df_reg = pd.DataFrame(columns=["student_id", "registration_id", "course_slug", "registered_on"])
+
         st.dataframe(df_reg, use_container_width=True)
 
-        # --- Attendance ---
-        st.subheader("🎥 Attendance Records (watched > 0 sec)")
-        att_query = f"""
-                        SELECT 
-            fa.value__student_id AS student_id,
-            fa.value__registrations_id AS registration_id,
-            dsc.course_slug,
-            fa.value__lesson_number__bigint AS lesson_number,
-            fa.value__watched__bigint AS watched_secs
-            FROM firestore_api.firestore_attendance fa
-            JOIN data_warehouse.dim_schedules dsc 
-            ON fa.value__registrations_id = dsc.registration_id
-            WHERE fa.value__student_id IN ({formatted_ids}) AND fa.value__watched__bigint > 0;
-        """
-        df_att = run_query(att_query)
+        
+        if ids:
+            reg_query = f"""
+                SELECT DISTINCT student_id, registration_id, course_slug, registered_on
+                FROM data_warehouse.dim_schedules
+                WHERE student_id IN ({formatted_resolved_ids})
+                ORDER BY student_id, registered_on;
+            """
+            df_reg = run_query(reg_query)
+        else:
+            df_reg = pd.DataFrame(columns=["student_id", "registration_id", "course_slug", "registered_on"])
+
+        # --- 6. Revenue Breakdown ---
+        st.subheader("💰 Revenue & Transactions")
+
+        if resolved_ids:
+            rev_query = f"""
+                SELECT student_id, transaction_id, payment_date, converted_amount,
+                    CASE
+                        WHEN description ILIKE '%lifetime%' THEN 'Rev2'
+                        WHEN description ILIKE '%course%' OR description ILIKE '%material%' OR description ILIKE '%hard%' THEN 'Rev3'
+                        WHEN plan_id IS NOT NULL THEN 'Rev1'
+                        ELSE 'Other'
+                    END AS revenue_type,
+                    description
+                FROM data_marts.combined_transactions
+                WHERE student_id IN ({formatted_resolved_ids})
+                AND converted_amount > 0
+                ORDER BY student_id, payment_date;
+            """
+            df_rev = run_query(rev_query)
+        else:
+            df_rev = pd.DataFrame(columns=["student_id", "transaction_id", "payment_date", "converted_amount", "revenue_type", "description"])
+
+        st.dataframe(df_rev, use_container_width=True)
+
+
+
+        # --- 5. Attendance After Registration (for filtered students only) ---
+        st.subheader("🎥 Attendance (Watched > 0 sec, Post Registration)")
+
+        if resolved_ids:
+            att_query = f"""
+                SELECT 
+                    dsc.student_id,
+                    fa.value__registrations_id AS registration_id,
+                    dsc.course_slug,
+                    dsc.registered_on,
+                    fa.value__lesson_number__bigint AS lesson_number,
+                    fa.value__watched__bigint AS watched_secs
+                FROM firestore_api.firestore_attendance fa
+                JOIN data_warehouse.dim_schedules dsc
+                ON fa.value__registrations_id = dsc.registration_id
+                WHERE dsc.student_id IN ({formatted_resolved_ids})
+                AND fa.value__watched__bigint > 0
+                ORDER BY dsc.student_id, dsc.registered_on, fa.value__lesson_number__bigint;
+            """
+            df_att = run_query(att_query)
+        else:
+            df_att = pd.DataFrame(columns=["student_id", "registration_id", "course_slug", "registered_on", "lesson_number", "watched_secs"])
+
         st.dataframe(df_att, use_container_width=True)
 
-        # --- Revenue ---
-        st.subheader("💰 Revenue & Transaction Details")
-        rev_query = f"""
-            SELECT student_id, transaction_id, payment_date, converted_amount,
-                   CASE
-                       WHEN description ILIKE '%lifetime%' THEN 'Rev2'
-                       WHEN description ILIKE '%course%' OR description ILIKE '%toolkit%' OR description ILIKE '%hard%' THEN 'Rev3'
-                       WHEN plan_id IS NOT NULL THEN 'Rev1'
-                       ELSE 'Other'
-                   END AS revenue_type,
-                   description
-            FROM data_marts.combined_transactions
-            WHERE student_id IN ({formatted_ids})
-              AND converted_amount > 0
-            ORDER BY student_id, payment_date;
-        """
-        df_rev = run_query(rev_query)
-        st.dataframe(df_rev, use_container_width=True)
+        # --- 📊 Lesson-wise Attendance Chart Grouped by Student ID ---
+        if not df_att.empty:
+            df_att["watched_mins"] = df_att["watched_secs"] / 60
+            df_att["lesson_number"] = df_att["lesson_number"].astype(int)
+            df_att["registered_on"] = pd.to_datetime(df_att["registered_on"])
+
+            st.subheader("📊 Lesson-wise Attendance by Registration (Grouped by Student)")
+
+            for student_id, student_df in df_att.groupby("student_id"):
+                with st.expander(f"👤 Student ID: {student_id}", expanded=False):
+                    for (reg_id, course), reg_df in student_df.groupby(["registration_id", "course_slug"]):
+                        reg_date = reg_df["registered_on"].iloc[0].strftime("%Y-%m-%d")
+
+                        # 🔄 Replace inner expander with stylized markdown
+                        st.markdown(
+                            f"""
+                            <div style='margin-bottom: 10px; margin-top: 20px;'>
+                                <b>📘 Course:</b> <span style='color: #4AE0A7;'>{course}</span> &nbsp;&nbsp;
+                                <b>📅 Registered On:</b> <span style='color: #F96900;'>{reg_date}</span><br>
+                                <b>🆔 Registration ID:</b> <code>{reg_id}</code>
+                            </div>
+                            """, unsafe_allow_html=True
+                        )
+
+                        fig = px.bar(
+                            reg_df.sort_values("lesson_number"),
+                            x="lesson_number",
+                            y="watched_mins",
+                            title=None,
+                            labels={"lesson_number": "Lesson Number", "watched_mins": "Minutes Watched"},
+                            height=350
+                        )
+                        fig.update_layout(
+                            xaxis=dict(tickmode='linear'),
+                            bargap=0.3,
+                            margin=dict(t=10, l=10, r=10, b=30),
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+
+
+        # --- 5. Attendance ---
+        st.subheader("🎥 Attendance Records (watched > 0 sec)")
+
+        if resolved_ids:
+            att_query = f"""
+                SELECT 
+                    fa.value__student_id AS student_id,
+                    fa.value__registrations_id AS registration_id,
+                    dsc.course_slug,
+                    fa.value__lesson_number__bigint AS lesson_number,
+                    fa.value__watched__bigint AS watched_secs
+                FROM firestore_api.firestore_attendance fa
+                JOIN data_warehouse.dim_schedules dsc 
+                    ON fa.value__registrations_id = dsc.registration_id
+                WHERE fa.value__student_id IN ({formatted_resolved_ids})
+                AND fa.value__watched__bigint > 0;
+            """
+            df_att = run_query(att_query)
+        else:
+            df_att = pd.DataFrame(columns=["student_id", "registration_id", "course_slug", "lesson_number", "watched_secs"])
+
+        st.dataframe(df_att, use_container_width=True)
+
+        # --- 📊 Attendance Chart per Course
+        if not df_att.empty:
+            df_att["watched_mins"] = df_att["watched_secs"] / 60
+            df_att["lesson_number"] = df_att["lesson_number"].astype(int)
+
+            st.subheader("📊 Lesson-wise Attendance by Course")
+
+            for course in df_att["course_slug"].unique():
+                st.markdown(f"**📘 Course: `{course}`**")
+
+                fig = px.bar(
+                    df_att[df_att["course_slug"] == course].sort_values("lesson_number"),
+                    x="lesson_number",
+                    y="watched_mins",
+                    color="student_id",
+                    barmode="group",
+                    labels={"lesson_number": "Lesson Number", "watched_mins": "Minutes Watched"},
+                    height=350
+                )
+                fig.update_layout(
+                    xaxis=dict(tickmode='linear'),
+                    bargap=0.25,
+                    margin=dict(t=10, l=10, r=10, b=40),
+                )
+                st.plotly_chart(fig, use_container_width=True)
