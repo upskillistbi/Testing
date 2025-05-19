@@ -169,12 +169,13 @@ if st.button("🔍 Run Lookup") and user_input:
         st.subheader("🎥 Attendance (Watched > 0 sec, Post Registration)")
 
         if resolved_ids:
-            att_query = f"""
-                SELECT 
+            att_query_post_reg = f"""
+                SELECT distinct 
                     dsc.student_id,
                     fa.value__registrations_id AS registration_id,
                     dsc.course_slug,
-                    dsc.registered_on,
+                    fa.value__create_at AS attended_on,
+                    fa.value__module_number__bigint AS module_number,
                     fa.value__lesson_number__bigint AS lesson_number,
                     fa.value__watched__bigint AS watched_secs
                 FROM firestore_api.firestore_attendance fa
@@ -182,94 +183,110 @@ if st.button("🔍 Run Lookup") and user_input:
                 ON fa.value__registrations_id = dsc.registration_id
                 WHERE dsc.student_id IN ({formatted_resolved_ids})
                 AND fa.value__watched__bigint > 0
-                ORDER BY dsc.student_id, dsc.registered_on, fa.value__lesson_number__bigint;
+                ORDER BY dsc.student_id, fa.value__create_at, module_number, lesson_number;
             """
-            df_att = run_query(att_query)
+            df_att_post = run_query(att_query_post_reg)
         else:
-            df_att = pd.DataFrame(columns=["student_id", "registration_id", "course_slug", "registered_on", "lesson_number", "watched_secs"])
+            df_att_post = pd.DataFrame(columns=[
+                "student_id", "registration_id", "course_slug", "attended_on",
+                "module_number", "lesson_number", "watched_secs"
+            ])
 
-        st.dataframe(df_att, use_container_width=True)
+        st.dataframe(df_att_post, use_container_width=True)
+        # --- 📊 Attendance Grouped by Module (Color = Lesson) ---
+        if not df_att_post.empty:
+            df_att_post["watched_mins"] = df_att_post["watched_secs"] / 60
+            df_att_post["lesson_number"] = df_att_post["lesson_number"].astype(int)
+            df_att_post["module_number"] = df_att_post["module_number"].astype('Int64')
+            df_att_post["attended_on"] = pd.to_datetime(df_att_post["attended_on"])
 
-        # --- 📊 Lesson-wise Attendance Chart Grouped by Student ID ---
-        if not df_att.empty:
-            df_att["watched_mins"] = df_att["watched_secs"] / 60
-            df_att["lesson_number"] = df_att["lesson_number"].astype(int)
-            df_att["registered_on"] = pd.to_datetime(df_att["registered_on"])
+            st.subheader("📊 Module-wise Attendance (Colored by Lesson)")
 
-            st.subheader("📊 Lesson-wise Attendance by Registration (Grouped by Student)")
-
-            for student_id, student_df in df_att.groupby("student_id"):
+            for student_id, student_df in df_att_post.groupby("student_id"):
                 with st.expander(f"👤 Student ID: {student_id}", expanded=False):
                     for (reg_id, course), reg_df in student_df.groupby(["registration_id", "course_slug"]):
-                        reg_date = reg_df["registered_on"].iloc[0].strftime("%Y-%m-%d")
-
-                        # 🔄 Replace inner expander with stylized markdown
+                        watch_dates = reg_df["attended_on"].dt.date.unique()
                         st.markdown(
                             f"""
                             <div style='margin-bottom: 10px; margin-top: 20px;'>
                                 <b>📘 Course:</b> <span style='color: #4AE0A7;'>{course}</span> &nbsp;&nbsp;
-                                <b>📅 Registered On:</b> <span style='color: #F96900;'>{reg_date}</span><br>
+                                <b>🕒 Watch Dates:</b> <span style='color: #F96900;'>{', '.join(map(str, watch_dates))}</span><br>
                                 <b>🆔 Registration ID:</b> <code>{reg_id}</code>
                             </div>
                             """, unsafe_allow_html=True
                         )
 
                         fig = px.bar(
-                            reg_df.sort_values("lesson_number"),
-                            x="lesson_number",
+                            reg_df,
+                            x="module_number",
                             y="watched_mins",
+                            color="lesson_number",
+                            barmode="group",
+                            labels={
+                                "module_number": "Module Number",
+                                "lesson_number": "Lesson",
+                                "watched_mins": "Minutes Watched"
+                            },
                             title=None,
-                            labels={"lesson_number": "Lesson Number", "watched_mins": "Minutes Watched"},
-                            height=350
+                            height=400
                         )
                         fig.update_layout(
-                            xaxis=dict(tickmode='linear'),
-                            bargap=0.3,
+                            bargap=0.2,
+                            xaxis=dict(type="category"),
                             margin=dict(t=10, l=10, r=10, b=30),
+                            legend_title="Lesson"
                         )
                         st.plotly_chart(fig, use_container_width=True)
-
-
-        # --- 5. Attendance ---
-        st.subheader("🎥 Attendance Records (watched > 0 sec)")
+            
+            
+            
+        # --- 6. Attendance (All-Time Records) ---
+        st.subheader("🎥 Attendance Records (Watched > 0 sec)")
 
         if resolved_ids:
-            att_query = f"""
-                SELECT 
+            att_query_all = f"""
+                SELECT distinct
                     fa.value__student_id AS student_id,
                     fa.value__registrations_id AS registration_id,
                     dsc.course_slug,
+                    fa.value__module_number__bigint AS module_number,
                     fa.value__lesson_number__bigint AS lesson_number,
                     fa.value__watched__bigint AS watched_secs
                 FROM firestore_api.firestore_attendance fa
                 JOIN data_warehouse.dim_schedules dsc 
-                    ON fa.value__registrations_id = dsc.registration_id
+                ON fa.value__registrations_id = dsc.registration_id
                 WHERE fa.value__student_id IN ({formatted_resolved_ids})
                 AND fa.value__watched__bigint > 0;
             """
-            df_att = run_query(att_query)
+            df_att_all = run_query(att_query_all)
         else:
-            df_att = pd.DataFrame(columns=["student_id", "registration_id", "course_slug", "lesson_number", "watched_secs"])
+            df_att_all = pd.DataFrame(columns=[
+                "student_id", "registration_id", "course_slug",
+                "module_number", "lesson_number", "watched_secs"
+            ])
 
-        st.dataframe(df_att, use_container_width=True)
+        st.dataframe(df_att_all, use_container_width=True)
 
-        # --- 📊 Attendance Chart per Course
-        if not df_att.empty:
-            df_att["watched_mins"] = df_att["watched_secs"] / 60
-            df_att["lesson_number"] = df_att["lesson_number"].astype(int)
+        # --- 📊 Attendance Chart per Course ---
+        if not df_att_all.empty:
+            df_att_all["watched_mins"] = df_att_all["watched_secs"] / 60
+            df_att_all["lesson_number"] = df_att_all["lesson_number"].astype(int)
+            df_att_all["module_number"] = df_att_all["module_number"].astype('Int64')
 
             st.subheader("📊 Lesson-wise Attendance by Course")
 
-            for course in df_att["course_slug"].unique():
+            for course in df_att_all["course_slug"].unique():
                 st.markdown(f"**📘 Course: `{course}`**")
 
+                course_data = df_att_all[df_att_all["course_slug"] == course].sort_values(["module_number", "lesson_number"])
+
                 fig = px.bar(
-                    df_att[df_att["course_slug"] == course].sort_values("lesson_number"),
+                    course_data,
                     x="lesson_number",
                     y="watched_mins",
-                    color="student_id",
+                    color="module_number",
                     barmode="group",
-                    labels={"lesson_number": "Lesson Number", "watched_mins": "Minutes Watched"},
+                    labels={"lesson_number": "Lesson", "watched_mins": "Minutes Watched"},
                     height=350
                 )
                 fig.update_layout(
