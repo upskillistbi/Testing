@@ -852,7 +852,7 @@ if st.button("🚀 Run Analysis - All numbers are for the CC cohort selected in 
                 
                 {course_details_where_clause}
                 and cs.created_at BETWEEN '{start_date}' AND '{end_date}'
-                and fa.value__watched__bigint > 300
+                and fa.value__watched__bigint > 0
                 GROUP BY 1 ORDER BY total_students_attended DESC;
             """
             df = run_query(query, start_date, end_date)
