@@ -75,7 +75,7 @@ if run_btn:
     # 1. CC Summary
     cc_summary_query = f"""
     WITH cc_base AS (
-      SELECT s.value__meta_data_lead_id AS cc_id,
+      SELECT DISTINCT s.value__meta_data_lead_id AS cc_id,
              DATE_TRUNC('month', s.created_at) AS cc_month,
              s.created_at AS cc_created_at
       FROM data_marts.combined_subscriptions s
@@ -94,7 +94,7 @@ if run_btn:
       FROM data_warehouse.dim_students
     ),
     cc_flagged AS (
-      SELECT cb.cc_id, cb.cc_month, cb.cc_created_at, ft.first_txn_date, sc.country,
+      SELECT DISTINCT cb.cc_id, cb.cc_month, cb.cc_created_at, ft.first_txn_date, sc.country,
              CASE WHEN ft.first_txn_date > cb.cc_created_at AND ft.first_txn_date <= cb.cc_created_at + INTERVAL '30 day'
                   THEN 1 ELSE 0 END AS is_first_time_buyer
       FROM cc_base cb
@@ -118,7 +118,7 @@ if run_btn:
     # 2. Revenue Data Query
     base_query = f"""
     WITH cc_base AS (
-      SELECT s.value__meta_data_lead_id AS cc_id, s.created_at AS cc_created_at,
+      SELECT DISTINCT s.value__meta_data_lead_id AS cc_id, s.created_at AS cc_created_at,
              DATE_TRUNC('month', s.created_at) AS cc_month
       FROM data_marts.combined_subscriptions s
       LEFT JOIN data_warehouse.dim_students ds ON s.value__meta_data_lead_id = ds.student_id
@@ -127,7 +127,7 @@ if run_btn:
         AND {offer_filter_sql}
     ),
     transaction_tags AS (
-      SELECT t.transaction_id, t.student_id, t.payment_date, t.converted_amount, t.plan_id,
+      SELECT DISTINCT t.transaction_id, t.student_id, t.payment_date, t.converted_amount, t.plan_id,
              t.billing_period_t, t.description,
              CASE
                WHEN t.description ILIKE '%lifetime%' THEN 'Rev2'
