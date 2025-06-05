@@ -171,12 +171,13 @@ if run_btn:
 
     rev_df = run_query(base_query)
 
+    rev_df["revenue"] = pd.to_numeric(rev_df["revenue"], errors="coerce").fillna(0)
+
     rev_df["cumulative_revenue"] = (
         rev_df.sort_values(["cc_month", "revenue_type", "month_bucket"])
         .groupby(["cc_month", "revenue_type"])["revenue"]
         .cumsum()
     )
-
     summary_table = (
         rev_df.groupby(["cc_month", "revenue_type", "month_bucket"])
         .agg(
