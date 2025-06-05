@@ -2,3 +2,6 @@ streamlit
 pandas
 psycopg2-binary
 plotly
+transformers==4.40.1
+gTTS==2.5.1
+torch>=2.0.0
