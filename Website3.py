@@ -226,3 +226,65 @@ if run_btn:
 
         pivoted.index.name = "CC Month"
         st.dataframe(pivoted.style.format("{:,.0f}"))
+
+
+        # --- Alternate View: Calendar Month Buckets (Month 1, 2, 3...) ---
+    with st.expander("📊 Alternate View: Revenue by Calendar Month since CC Creation"):
+        month_diff_query = f"""
+        WITH cc_base AS (
+          SELECT s.value__meta_data_lead_id AS cc_id, s.created_at AS cc_created_at,
+                 DATE_TRUNC('month', s.created_at) AS cc_month
+          FROM data_marts.combined_subscriptions s
+          LEFT JOIN data_warehouse.dim_students ds ON s.value__meta_data_lead_id = ds.student_id
+          WHERE DATE_TRUNC('month', s.created_at) BETWEEN DATE '{start_date}' AND DATE '{end_date}'
+            AND {partner_filter_sql}
+            AND {offer_filter_sql}
+        ),
+        transaction_tags AS (
+          SELECT t.transaction_id, t.student_id, t.payment_date, t.converted_amount, t.plan_id,
+                 t.billing_period_t, t.description,
+                 CASE
+                   WHEN t.description ILIKE '%lifetime%' THEN 'Rev2'
+                   WHEN t.description ILIKE '%course%' OR t.description ILIKE '%material%' OR t.description ILIKE '%hard%' THEN 'Rev3'
+                   WHEN t.plan_id IS NOT NULL THEN 'Rev1'
+                   ELSE 'Other'
+                 END AS revenue_type
+          FROM data_marts.combined_transactions t
+          WHERE t.value__refunded_txn_id IS NULL
+        ),
+        student_country AS (
+          SELECT student_id, LOWER(country) AS country FROM data_warehouse.dim_students
+        )
+        SELECT TO_CHAR(cb.cc_month, 'Mon-YY') AS cc_month,
+               tx.revenue_type,
+               DATEDIFF(month, cb.cc_created_at, tx.payment_date) + 1 AS month_number,
+               SUM(tx.converted_amount) AS revenue
+        FROM cc_base cb
+        JOIN transaction_tags tx ON cb.cc_id = tx.student_id
+        JOIN student_country sc ON tx.student_id = sc.student_id
+        WHERE {country_filter_sql}
+          AND tx.payment_date > cb.cc_created_at
+          AND tx.payment_date <= cb.cc_created_at + INTERVAL '365 day'
+        GROUP BY 1, 2, 3
+        ORDER BY 1, 2, 3;
+        """
+
+        month_diff_df = run_query(month_diff_query)
+        month_diff_df["month_label"] = "Month " + month_diff_df["month_number"].astype(str)
+
+        pivot_calendar = (
+            month_diff_df.pivot_table(
+                index="cc_month",
+                columns="month_label",
+                values="revenue",
+                aggfunc="sum"
+            ).fillna(0)
+        )
+
+        pivot_calendar["Total"] = pivot_calendar.sum(axis=1)
+        total_row = pivot_calendar.sum().to_frame().T
+        total_row.index = ["Total"]
+        pivot_calendar = pd.concat([pivot_calendar, total_row])
+
+        pivot_calendar.index.name = "CC Month"
+        st.dataframe(pivot_calendar.style.format("{:,.0f}"))
