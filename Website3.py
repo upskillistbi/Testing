@@ -142,22 +142,7 @@ if run_btn:
       SELECT student_id, LOWER(country) AS country FROM data_warehouse.dim_students
     )
     SELECT TO_CHAR(cb.cc_month, 'Mon-YY') AS cc_month,
-           tx.revenue_type,
-           CASE
-             WHEN DATEDIFF(DAY, cb.cc_created_at, tx.payment_date) BETWEEN 0 AND 30 THEN 'Month1'
-             WHEN DATEDIFF(DAY, cb.cc_created_at, tx.payment_date) BETWEEN 31 AND 60 THEN 'Month2'
-             WHEN DATEDIFF(DAY, cb.cc_created_at, tx.payment_date) BETWEEN 61 AND 90 THEN 'Month3'
-             WHEN DATEDIFF(DAY, cb.cc_created_at, tx.payment_date) BETWEEN 91 AND 120 THEN 'Month4'
-             WHEN DATEDIFF(DAY, cb.cc_created_at, tx.payment_date) BETWEEN 121 AND 150 THEN 'Month5'
-             WHEN DATEDIFF(DAY, cb.cc_created_at, tx.payment_date) BETWEEN 151 AND 180 THEN 'Month6'
-             WHEN DATEDIFF(DAY, cb.cc_created_at, tx.payment_date) BETWEEN 181 AND 210 THEN 'Month7'
-             WHEN DATEDIFF(DAY, cb.cc_created_at, tx.payment_date) BETWEEN 211 AND 240 THEN 'Month8'
-             WHEN DATEDIFF(DAY, cb.cc_created_at, tx.payment_date) BETWEEN 241 AND 270 THEN 'Month9'
-             WHEN DATEDIFF(DAY, cb.cc_created_at, tx.payment_date) BETWEEN 271 AND 300 THEN 'Month10'
-             WHEN DATEDIFF(DAY, cb.cc_created_at, tx.payment_date) BETWEEN 301 AND 330 THEN 'Month11'
-             WHEN DATEDIFF(DAY, cb.cc_created_at, tx.payment_date) BETWEEN 331 AND 360 THEN 'Month12'
-             ELSE '>Month12'
-           END AS month_bucket,
+           tx.revenue_type,'Month' || (DATEDIFF(month, DATE_TRUNC('month', cb.cc_created_at), DATE_TRUNC('month', tx.payment_date)) + 1)::VARCHAR AS month_bucket,
            SUM(tx.converted_amount) AS revenue
     FROM cc_base cb
     JOIN transaction_tags tx ON cb.cc_id = tx.student_id
