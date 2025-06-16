@@ -64,14 +64,13 @@ run_btn = st.sidebar.button("▶️ Run Analysis")
 if run_btn:
 
     country_filter_sql = ("TRUE" if not selected_countries else
-                           f"LOWER(sc.country) IN ({','.join([f'\'{c}\'' for c in selected_countries])})")
+                           f"LOWER(sc.country) IN ({','.join([repr(c)for c in selected_countries])})")
 
     partner_filter_sql = ("TRUE" if not selected_partners else
-                           f"ds.profile__partner_identifier IN ({','.join([f'\'{p}\'' for p in selected_partners])})")
+                           f"ds.profile__partner_identifier IN ({','.join([repr(p) for p in selected_partners])})")
 
     offer_filter_sql = ("TRUE" if not selected_offers else
-                         f"ds.offer_type IN ({','.join([f'\'{o}\'' for o in selected_offers])})")
-
+                         f"ds.offer_type IN ({','.join([repr(o) for o in selected_offers])})")
     # 1. CC Summary
     cc_summary_query = f"""
     WITH cc_base AS (
@@ -172,13 +171,29 @@ if run_btn:
         .reset_index()
     )
 
+    summary_table1=summary_table.copy();
+
     summary_table = summary_table.merge(
         cc_df[["cc_month_label", "total_ccs"]],
         left_on="cc_month",
         right_on="cc_month_label",
         how="left"
     )
+
+
     summary_table["avg_revenue_per_cc"] = summary_table["cumulative_revenue"] / summary_table["total_ccs"]
+    
+    # Add this sorting step:
+
+
+
+    # Convert and sort before pivot
+    summary_table["cc_month_dt"] = pd.to_datetime(summary_table["cc_month"], format='%b-%y')
+    summary_table = summary_table.sort_values("cc_month_dt")
+    summary_table["cc_month_label"] = summary_table["cc_month_dt"].dt.strftime('%b-%y')
+
+    # Get the correct month order for later use
+    sorted_months = summary_table["cc_month_label"].unique()
 
     for table_name, value_column in [
         ("Rev1", "total_revenue"),
@@ -194,12 +209,18 @@ if run_btn:
                     if table_name in ["Rev1", "Rev2", "Rev3"]
                     else summary_table.copy())
 
+          
         pivoted = df_pivot.pivot_table(
             index="cc_month_label",
             columns="month_bucket",
             values=value_column,
             aggfunc="sum"
         ).fillna(0)
+
+
+        # Ensure rows are in correct order
+        pivoted = pivoted.reindex(sorted_months)
+        
 
         ordered_months = [f"Month{i}" for i in range(1, 13)] + [">Month12"]
         pivoted = pivoted[[m for m in ordered_months if m in pivoted.columns]]
@@ -209,8 +230,9 @@ if run_btn:
         total_row.name = "Total"
         pivoted = pd.concat([pivoted, total_row.to_frame().T])
 
-        pivoted.index.name = "CC Month"
+
         st.dataframe(pivoted.style.format("{:,.0f}"))
+
 
 
         # --- Alternate View: Calendar Month Buckets (Month 1, 2, 3...) ---
