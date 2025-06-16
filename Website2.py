@@ -40,7 +40,7 @@ def get_filter_options():
 def build_where_clause(countries, partners, offers):
     clause = "WHERE cs.created_at BETWEEN '{start_date}' AND '{end_date}'"
     if countries:
-        clause += f" AND ds.country IN ({', '.join([repr(c) for c in countries])})"
+        clause += f" AND LOWER(ds.country) IN ({', '.join([repr(c.lower()) for c in countries])})"
     if partners:
         clause += f" AND ds.profile__partner_identifier IN ({', '.join([repr(p) for p in partners])})"
     if offers:
@@ -49,7 +49,7 @@ def build_where_clause(countries, partners, offers):
 def build_revenue_where_clause(countries, partners, offers):
     clause = ""
     if countries:
-        clause += f" AND ds.country IN ({', '.join([repr(c) for c in countries])})"
+        clause += f" AND LOWER(ds.country) IN ({', '.join([repr(c.lower()) for c in countries])})"
     if partners:
         clause += f" AND ds.profile__partner_identifier IN ({', '.join([repr(p) for p in partners])})"
     if offers:
@@ -58,7 +58,7 @@ def build_revenue_where_clause(countries, partners, offers):
 def build_course_details_where_clause(countries, partners, offers):
     clause = "WHERE cs.created_at BETWEEN '{start_date}' AND '{end_date}'"
     if countries:
-        clause += f" AND ds.country IN ({', '.join([repr(c) for c in countries])})"
+        clause += f" AND LOWER(ds.country) IN ({', '.join([repr(c.lower()) for c in countries])})"
     if partners:
         clause += f" AND ds.profile__partner_identifier IN ({', '.join([repr(p) for p in partners])})"
     if offers:
@@ -68,7 +68,7 @@ def build_course_details_where_clause(countries, partners, offers):
 def build_course_details_where_clause(countries, partners, offers):
     clause = "WHERE cs.created_at BETWEEN '{start_date}' AND '{end_date}'"
     if countries:
-        clause += f" AND ds.country IN ({', '.join([repr(c) for c in countries])})"
+        clause += f" AND LOWER(ds.country) IN ({', '.join([repr(c.lower()) for c in countries])})"
     if partners:
         clause += f" AND ds.profile__partner_identifier IN ({', '.join([repr(p) for p in partners])})"
     if offers:
